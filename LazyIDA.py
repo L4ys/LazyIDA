@@ -260,17 +260,11 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             if ea != idaapi.BADADDR:
                 copy_to_clip("0x%X" % (base + ea))
                 print "Address 0x%X has been copied to clipboard" % (base + ea)
-        elif self.index == ACTION_HX_COPYNAME:
-            vdui = idaapi.get_tform_vdui(ctx.form)
-            if vdui.item.citype == idaapi.VDI_EXPR:
-                buf = vdui.item.e.print1(None)
-                if "?op" not in buf:
-                    try:
-                        buf = buf.split("\x01")[-1].split("\x02")[-2].strip()
-                        copy_to_clip(buf)
-                        print "%s has been copied to clipboard" % buf
-                    except:
-                        pass
+        elif self.action == ACTION_HX_COPYNAME:
+            name = idaapi.get_highlighted_identifier()
+            if name:
+                copy_to_clip(name)
+                print "%s has been copied to clipboard" % name
         else:
             return 0
 
