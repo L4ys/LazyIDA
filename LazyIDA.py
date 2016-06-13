@@ -170,16 +170,16 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     print output.replace("0X", "0x")
 
         elif self.action == ACTION_SCANVUL:
-            # scan vul
             print "\n[+] Finding Format String Vulnerability..."
             found = []
-            for addr, name in Names():
+            for addr in Functions():
+                name = GetFunctionName(addr)
                 if "printf" in name and "v" not in name and SegName(addr) in (".text", ".plt", ".idata"):
                     xrefs = CodeRefsTo(addr, False)
                     for xref in xrefs:
                         vul = self.check_fmt_function(name, xref)
                         if vul:
-                            found += vul
+                            found.append(vul)
             if found:
                 print "[!] Done! %d possible vulnerabilities found." % len(found)
                 ch = VulnChoose("Vulnerability", found, None, False)
@@ -199,47 +199,60 @@ class menu_action_handler_t(idaapi.action_handler_t):
         """
         Check if the format string argument is not valid
         """
-        found = []
         function_head = GetFunctionAttr(addr, idc.FUNCATTR_START)
 
         while True:
             addr = idc.PrevHead(addr)
-            if GetMnem(addr) in ("call", "ret", "retn", "jmp") or addr < function_head:
-                return 0
+            op = GetMnem(addr)
+            dst = GetOpnd(addr, 0)
+
+            if op in ("call", "ret", "retn", "jmp") or addr < function_head:
+                return
 
             c = GetCommentEx(addr, 0)
-            if c == "format":
-                optype = GetOpType(addr, 1)
-                opnd = GetOpnd(addr, 1)
+            if c and c.lower() == "format":
+                # Get last opnd
+                op_index = 1 if "," in GetDisasm(addr) else 0
                 break
-            elif c == "Format": # win32
-                optype = GetOpType(addr, 0)
-                opnd = GetOpnd(addr, 0)
-                break
-            elif "sprintf" in name or "fprintf" in name:
-                if any(["mov" in GetMnem(addr) and GetOpnd(addr, 0) in ("rsi", "[esp+4]"),
-                        "lea" == GetMnem(addr) and GetOpnd(addr, 0) == "rsi"]):
-                    optype = GetOpType(addr, 1)
-                    opnd = GetOpnd(addr, 1)
-                    break
             elif "snprintf" in name or "fnprintf" in name:
-                if any(["mov" in GetMnem(addr) and GetOpnd(addr, 0) in ("rdx", "[esp+8]"),
-                        "lea" == GetMnem(addr) and GetOpnd(addr, 0) == "rdx"]):
-                    optype = GetOpType(addr, 1)
-                    opnd = GetOpnd(addr, 1)
+                if op in ("mov", "lea") and dst in ("rdx", "[esp+8]"):
+                    op_index = 1
+                    break
+            elif "sprintf" in name or "fprintf" in name or "dprintf" in name or "printf_chk" in name:
+                if op in ("mov", "lea") and dst in ("rsi", "[esp+4]"):
+                    op_index = 1
                     break
             elif "printf" in name:
-                if any(["mov" in GetMnem(addr) and GetOpnd(addr, 0) in ("rdi", "[esp]"),
-                        "lea" == GetMnem(addr) and GetOpnd(addr, 0) == "rdi"]):
-                    optype = GetOpType(addr, 1)
-                    opnd = GetOpnd(addr, 1)
+                if op in ("mov", "lea") and dst in ("rdi", "[esp]"):
+                    op_index = 1
                     break
 
-        if optype != o_imm and optype != o_mem:
-            print "0x%X: Possible Vulnerability: %s, format = %s" % (addr, name, opnd)
-            found.append(["0x%X" % addr, name, opnd])
+        op_type = GetOpType(addr, op_index)
+        opnd = GetOpnd(addr, op_index)
 
-        return found
+        if op_type == o_reg:
+            # format is in register, try to track back and get the source
+            ea = addr
+            while True:
+                ea = idc.PrevHead(ea)
+                if GetMnem(ea) in ("call", "ret", "retn", "jmp") or ea < function_head:
+                    break
+                elif GetMnem(ea) in ("mov", "lea") and GetOpnd(ea, 0) == opnd:
+                    op_type = GetOpType(ea, 1)
+                    opnd = GetOpnd(ea, 1)
+                    addr = ea
+
+        if op_type == o_imm or op_type == o_mem:
+            # format is a memory address, check if it's in writable segment
+            op_addr = GetOperandValue(addr, op_index)
+            seg = idaapi.getseg(op_addr)
+            if seg:
+                if not seg.perm & idaapi.SEGPERM_WRITE:
+                    # format is in read-only segment
+                    return
+
+        print "0x%X: Possible Vulnerability: %s, format = %s" % (addr, name, opnd)
+        return ["0x%X" % addr, name, opnd]
 
 class hexrays_action_handler_t(idaapi.action_handler_t):
     """
@@ -425,4 +438,3 @@ class LazyIDA_t(idaapi.plugin_t):
 
 def PLUGIN_ENTRY():
     return LazyIDA_t()
-
