@@ -214,15 +214,15 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 # Get last opnd
                 op_index = 1 if "," in GetDisasm(addr) else 0
                 break
-            elif "snprintf" in name or "fnprintf" in name:
+            elif name.endswith(("snprintf", "fnprintf")):
                 if op in ("mov", "lea") and dst in ("rdx", "[esp+8]"):
                     op_index = 1
                     break
-            elif "sprintf" in name or "fprintf" in name or "dprintf" in name or "printf_chk" in name:
+            elif name.endswith(("sprintf", "fprintf", "dprintf", "printf_chk")):
                 if op in ("mov", "lea") and dst in ("rsi", "[esp+4]"):
                     op_index = 1
                     break
-            elif "printf" in name:
+            elif name.endswith("printf"):
                 if op in ("mov", "lea") and dst in ("rdi", "[esp]"):
                     op_index = 1
                     break
@@ -441,8 +441,10 @@ class LazyIDA_t(idaapi.plugin_t):
         pass
 
     def term(self):
-        self.ui_hook.unhook()
-        self.idb_hook.unhook()
+        if self.ui_hook:
+            self.ui_hook.unhook()
+        if self.idb_hook:
+            self.idb_hook.unhook()
 
         # Unregister actions
         for action in self.registered_actions:
