@@ -110,7 +110,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     print "".join("%02X" % ord(b) for b in data)
                 elif self.action == ACTION_CONVERT[2]:
                     # C array
-                    output = "unsigned char data[%d] = {" % size;
+                    output = "unsigned char data[%d] = {" % size
                     j = 0
                     for i in range(size):
                         if j % 16 == 0:
@@ -301,10 +301,10 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
 
         elif vu.item.citype == idaapi.VDI_EXPR and vu.item.e and vu.item.e.type.is_funcptr():
             # call xxx
-            ea = vu.item.get_ea();
+            ea = vu.item.get_ea()
             old_func_type = idaapi.tinfo_t()
 
-            f = idaapi.get_func(ea);
+            f = idaapi.get_func(ea)
             if f:
                 try:
                     cfunc = idaapi.decompile(f)
@@ -384,9 +384,12 @@ class LazyIDA_t(idaapi.plugin_t):
 
     def init(self):
         self.hexrays_inited = False
+        self.registered_actions = []
+        self.registered_hx_actions = []
 
         print "LazyIDA (Python Version) (v1.0.0.1) plugin has been loaded."
 
+        # Register menu actions
         menu_actions = (
             idaapi.action_desc_t(ACTION_CONVERT[0], "Convert to string", menu_action_handler_t(ACTION_CONVERT[0]), None, None, 80),
             idaapi.action_desc_t(ACTION_CONVERT[1], "Convert to hex string", menu_action_handler_t(ACTION_CONVERT[1]), None, None, 8),
@@ -400,9 +403,15 @@ class LazyIDA_t(idaapi.plugin_t):
         )
         for action in menu_actions:
             idaapi.register_action(action)
+            self.registered_actions.append(action.name)
 
-        # Add hotkey action
-        idaapi.register_action(idaapi.action_desc_t(ACTION_COPYEA, "Copy EA", hotkey_action_handler_t(ACTION_COPYEA), "w", "Copy current EA", 0))
+        # Register hotkey actions
+        hotkey_actions = (
+            idaapi.action_desc_t(ACTION_COPYEA, "Copy EA", hotkey_action_handler_t(ACTION_COPYEA), "w", "Copy current EA", 0),
+        )
+        for action in hotkey_actions:
+            idaapi.register_action(action)
+            self.registered_actions.append(action.name)
 
         # Add ui hook
         self.ui_hook = UI_Hook()
@@ -421,6 +430,8 @@ class LazyIDA_t(idaapi.plugin_t):
             )
             for action in hx_actions:
                 idaapi.register_action(action)
+                self.registered_hx_actions.append(action.name)
+
             idaapi.install_hexrays_callback(hexrays_callback)
             self.hexrays_inited = True
 
@@ -432,9 +443,18 @@ class LazyIDA_t(idaapi.plugin_t):
     def term(self):
         self.ui_hook.unhook()
         self.idb_hook.unhook()
+
+        # Unregister actions
+        for action in self.registered_actions:
+            idaapi.unregister_action(action)
+
         if self.hexrays_inited:
-            idaapi.remove_hexrays_callback(hexrays_callback);
-            idaapi.term_hexrays_plugin();
+            # Unregister hexrays actions
+            for action in self.registered_hx_actions:
+                idaapi.unregister_action(action)
+
+            idaapi.remove_hexrays_callback(hexrays_callback)
+            idaapi.term_hexrays_plugin()
 
 def PLUGIN_ENTRY():
     return LazyIDA_t()
