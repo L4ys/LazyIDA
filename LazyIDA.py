@@ -9,20 +9,31 @@ ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
 ACTION_HX_COPYNAME = "lazyida:hx_copyname"
 
-syscall_map = {
+cgc_syscall_map = {
     "LINUX - sys_exit": "CGC - _terminate",
     "LINUX - sys_fork": "CGC - transmit",
     "LINUX - sys_read": "CGC - receive",
     "LINUX - sys_write": "CGC - fdwait",
-    "LINUX - sys_open": 'CGC - allocate',
-    "LINUX - sys_close": 'CGC - deallocate',
-    "LINUX - sys_waitpid": 'CGC - random',
-    "LINUX - ": 'CGC - receive',
+    "LINUX - sys_open": "CGC - allocate",
+    "LINUX - sys_close": "CGC - deallocate",
+    "LINUX - sys_waitpid": "CGC - random",
+    "LINUX - ": "CGC - receive",
+}
+
+cgc_syscall_type_map = {
+    "__terminate": "void _terminate(int status);",
+    "_transmit": "int transmit(int fd, const void *buf, size_t count, size_t *tx_bytes);",
+    "_receive": "int receive(int fd, void *buf, size_t count, size_t *rx_bytes);",
+    "_fdwait": "int fdwait(int nfds, fd_set *readfds, fd_set *writefds, const struct timeval *timeout, int *readyfds);",
+    "_allocate": "int allocate(size_t length, int is_X, void **addr);",
+    "_deallocate": "int deallocate(void *addr, size_t length);",
+    "_random": "int random(void *buf, size_t count, size_t *rnd_bytes);",
 }
 
 u32 = lambda x: unpack("<I", x)[0]
 u64 = lambda x: unpack("<Q", x)[0]
 
+is_cgc = False
 arch = 0
 base = 0
 
@@ -307,14 +318,16 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             ea = vu.item.get_ea()
             old_func_type = idaapi.tinfo_t()
 
-            f = idaapi.get_func(ea)
-            if f:
+            func = idaapi.get_func(ea)
+            if func:
                 try:
-                    cfunc = idaapi.decompile(f)
+                    cfunc = idaapi.decompile(func)
                 except idaapi.DecompilationFailure:
                     return False
 
-            if not cfunc.get_func_type(old_func_type):
+                if not cfunc.get_func_type(old_func_type):
+                    return False
+            else:
                 return False
         else:
             return False
@@ -360,15 +373,26 @@ class IDB_Hook(idaapi.IDB_Hooks):
         idaapi.IDB_Hooks.__init__(self)
 
     def cmt_changed(self, ea, repeatable):
-        if "CGC" in idaapi.get_file_type_name():
+        if is_cgc:
             # fix cgc syscall comment
             cmt = GetCommentEx(ea, 0)
             if cmt and "LINUX - " in cmt:
-                if syscall_map.has_key(cmt):
-                    print "0x%X: Fix syscall comment: %s" % (ea, GetCommentEx(ea, 0))
-                    MakeComm(ea, syscall_map[cmt])
+                if cgc_syscall_map.has_key(cmt):
+                    print "[+] 0x%X: Fix CGC syscall comment: %s" % (ea, GetCommentEx(ea, 0))
+                    MakeComm(ea, cgc_syscall_map[cmt])
 
         return 0
+
+class IDP_Hook(idaapi.IDP_Hooks):
+    def __init__(self):
+        idaapi.IDP_Hooks.__init__(self)
+
+    def renamed(self, ea, new_name, local_name):
+        if is_cgc:
+            #print "renamed %x, %s, %s" % (ea, new_name, local_name)
+            if cgc_syscall_type_map.has_key(new_name):
+                SetType(ea, cgc_syscall_type_map[new_name])
+                print "[+] 0x%X: Fix CGC syscall type: %s" % (ea, new_name)
 
 def hexrays_callback(event, *args):
     if event == idaapi.hxe_populating_popup:
@@ -390,8 +414,12 @@ class LazyIDA_t(idaapi.plugin_t):
         self.registered_actions = []
         self.registered_hx_actions = []
 
-        print "LazyIDA (Python Version) (v1.0.0.1) plugin has been loaded."
+        global arch
+        global is_cgc
         arch = idaapi.ph_get_id()
+        is_cgc = "CGC" in idaapi.get_file_type_name()
+
+        print "LazyIDA (Python Version) (v1.0.0.1) plugin has been loaded."
 
         # Register menu actions
         menu_actions = (
@@ -425,6 +453,10 @@ class LazyIDA_t(idaapi.plugin_t):
         self.idb_hook = IDB_Hook()
         self.idb_hook.hook()
 
+        # Add idp hook
+        self.idp_hook = IDP_Hook()
+        self.idp_hook.hook()
+
         # Add hexrays ui callback
         if idaapi.init_hexrays_plugin():
             hx_actions = (
@@ -449,6 +481,8 @@ class LazyIDA_t(idaapi.plugin_t):
             self.ui_hook.unhook()
         if self.idb_hook:
             self.idb_hook.unhook()
+        if self.idp_hook:
+            self.idp_hook.unhook()
 
         # Unregister actions
         for action in self.registered_actions:
