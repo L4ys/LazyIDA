@@ -1,4 +1,5 @@
-﻿import idaapi
+import idaapi
+import subprocess
 from struct import unpack
 
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(8)]
@@ -44,7 +45,7 @@ def set_base(_base):
         raise TypeError("base must be a integer.")
 
 def copy_to_clip(data):
-    idaapi.IDAPython_ExecSystem('echo|set /p="%s"|clip' % data)
+    subprocess.call('echo|set /p="%s"|clip' % data, shell=True)
 
 class VulnChoose(Choose2):
     """
@@ -358,7 +359,6 @@ class UI_Hook(idaapi.UI_Hooks):
         idaapi.UI_Hooks.__init__(self)
 
     def finish_populating_tform_popup(self, form, popup):
-        # Or here, after the popup is done being populated by its owner.
         form_type = idaapi.get_tform_type(form)
 
         if ( form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP ) and all(idaapi.read_selection()):
@@ -380,7 +380,6 @@ class IDB_Hook(idaapi.IDB_Hooks):
                 if cgc_syscall_map.has_key(cmt):
                     print "[+] 0x%X: Fix CGC syscall comment: %s" % (ea, GetCommentEx(ea, 0))
                     MakeComm(ea, cgc_syscall_map[cmt])
-
         return 0
 
 class IDP_Hook(idaapi.IDP_Hooks):
@@ -389,7 +388,7 @@ class IDP_Hook(idaapi.IDP_Hooks):
 
     def renamed(self, ea, new_name, local_name):
         if is_cgc:
-            #print "renamed %x, %s, %s" % (ea, new_name, local_name)
+            # fix cgc syscall type
             if cgc_syscall_type_map.has_key(new_name):
                 SetType(ea, cgc_syscall_type_map[new_name])
                 print "[+] 0x%X: Fix CGC syscall type: %s" % (ea, new_name)
