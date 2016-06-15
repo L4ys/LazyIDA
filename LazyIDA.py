@@ -472,7 +472,7 @@ class LazyIDA_t(idaapi.plugin_t):
 
         # Auto apply libcgc signature
         if is_cgc and os.path.exists(idaapi.get_sig_filename("libcgc.sig")):
-            if "libcgc.sig" not in [idaapi.get_idasgn_desc(i)[0] for i in range(idaapi.get_idasgn_qty())]
+            if "libcgc.sig" not in [idaapi.get_idasgn_desc(i)[0] for i in range(idaapi.get_idasgn_qty())]:
                 idaapi.plan_to_apply_idasgn("libcgc.sig")
 
         return idaapi.PLUGIN_KEEP
