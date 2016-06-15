@@ -5,6 +5,7 @@ from struct import unpack
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(8)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
+ACTION_XORDATA = "lazyida:xordata"
 
 ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
@@ -105,10 +106,15 @@ class menu_action_handler_t(idaapi.action_handler_t):
         if self.action in ACTION_CONVERT:
             # convert
             selection, start, end = idaapi.read_selection()
-            if not selection or not start or not end:
+            if selection:
+                size = end - start
+            elif ItemSize(ScreenEA()) > 1:
+                start = ScreenEA()
+                size = ItemSize(start)
+                end = start + size
+            else:
                 return False
 
-            size = end - start
             data = idaapi.get_many_bytes(start, size)
             if data:
                 print "\n[+] Dump 0x%X - 0x%X (%u bytes) :" % ( start, end, size )
@@ -181,6 +187,21 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     output += ",".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8))
                     output += "]"
                     print output.replace("0X", "0x")
+        elif self.action == ACTION_XORDATA:
+            selection, start, end = idaapi.read_selection()
+            if not selection:
+                if ItemSize(ScreenEA()) > 1:
+                    start = ScreenEA()
+                    end = start + ItemSize(start)
+                else:
+                    return False
+
+            data = idaapi.get_many_bytes(start, end - start)
+            x = AskLong(0, "Xor with...")
+            if x:
+                x &= 0xFF
+                print "\n[+] Xor 0x%X - 0x%X (%u bytes) with 0x%02X:" % ( start, end, end - start, x )
+                print repr("".join(chr(ord(b) ^ x) for b in data))
 
         elif self.action == ACTION_SCANVUL:
             print "\n[+] Finding Format String Vulnerability..."
@@ -361,11 +382,13 @@ class UI_Hook(idaapi.UI_Hooks):
     def finish_populating_tform_popup(self, form, popup):
         form_type = idaapi.get_tform_type(form)
 
-        if ( form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP ) and all(idaapi.read_selection()):
-            for name in ACTION_CONVERT:
-                idaapi.attach_action_to_popup(form, popup, name, "Convert/")
-
-        if form_type == idaapi.BWN_DISASM and arch in (idaapi.PLFM_386, idaapi.PLFM_ARM):
+        if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
+            if idaapi.read_selection() or ItemSize(ScreenEA()) > 1:
+                idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
+                for action in ACTION_CONVERT:
+                    idaapi.attach_action_to_popup(form, popup, action, "Convert/")
+                
+        elif form_type == idaapi.BWN_DISASM and arch in (idaapi.PLFM_386, idaapi.PLFM_ARM):
             idaapi.attach_action_to_popup(form, popup, ACTION_SCANVUL, None)
 
 class IDB_Hook(idaapi.IDB_Hooks):
@@ -430,6 +453,7 @@ class LazyIDA_t(idaapi.plugin_t):
             idaapi.action_desc_t(ACTION_CONVERT[5], "Convert to python list (BYTE)", menu_action_handler_t(ACTION_CONVERT[5]), None, None, 201),
             idaapi.action_desc_t(ACTION_CONVERT[6], "Convert to python list (DWORD)", menu_action_handler_t(ACTION_CONVERT[6]), None, None, 201),
             idaapi.action_desc_t(ACTION_CONVERT[7], "Convert to python list (QWORD)", menu_action_handler_t(ACTION_CONVERT[7]), None, None, 201),
+            idaapi.action_desc_t(ACTION_XORDATA, "Get xored data", menu_action_handler_t(ACTION_XORDATA), None, None, 9),
             idaapi.action_desc_t(ACTION_SCANVUL, "Scan format string vulnerabilities", menu_action_handler_t(ACTION_SCANVUL), None, None, 160),
         )
         for action in menu_actions:
