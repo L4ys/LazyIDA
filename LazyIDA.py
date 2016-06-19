@@ -337,7 +337,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             if not vu.cfunc.get_func_type(old_func_type):
                 return False
 
-        elif vu.item.citype == idaapi.VDI_EXPR and vu.item.e and vu.item.e.type.is_funcptr():
+        elif vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr():
             # call xxx
             ea = vu.item.get_ea()
             old_func_type = idaapi.tinfo_t()
@@ -423,7 +423,7 @@ class IDP_Hook(idaapi.IDP_Hooks):
 def hexrays_callback(event, *args):
     if event == idaapi.hxe_populating_popup:
         form, phandle, vu = args
-        if ( vu.item.citype == idaapi.VDI_FUNC ) or ( vu.item.citype == idaapi.VDI_EXPR and vu.item.e and vu.item.e.type.is_funcptr() ):
+        if vu.item.citype == idaapi.VDI_FUNC or ( vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr() ):
             idaapi.attach_action_to_popup(form, phandle, ACTION_HX_REMOVERETTYPE, None)
 
     return 0
