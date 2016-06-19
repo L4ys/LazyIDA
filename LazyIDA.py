@@ -248,6 +248,14 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 # Get last opnd
                 op_index = 1 if "," in GetDisasm(addr) else 0
                 break
+            elif name.endswith(("snprintf_chk",)):
+                if op in ("mov", "lea") and dst in ("r8", "[esp+10h]"):
+                    op_index = 1
+                    break
+            elif name.endswith(("sprintf_chk",)):
+                if op in ("mov", "lea") and dst in ("rcx", "[esp+0Ch]", "R3"):
+                    op_index = 1
+                    break
             elif name.endswith(("snprintf", "fnprintf")):
                 if op in ("mov", "lea") and dst in ("rdx", "[esp+8]", "R2"):
                     op_index = 1
@@ -387,8 +395,8 @@ class UI_Hook(idaapi.UI_Hooks):
                 idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
                 for action in ACTION_CONVERT:
                     idaapi.attach_action_to_popup(form, popup, action, "Convert/")
-                
-        elif form_type == idaapi.BWN_DISASM and arch in (idaapi.PLFM_386, idaapi.PLFM_ARM):
+
+        if form_type == idaapi.BWN_DISASM and arch in (idaapi.PLFM_386, idaapi.PLFM_ARM):
             idaapi.attach_action_to_popup(form, popup, ACTION_SCANVUL, None)
 
 class IDB_Hook(idaapi.IDB_Hooks):
