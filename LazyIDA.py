@@ -37,13 +37,7 @@ u64 = lambda x: unpack("<Q", x)[0]
 
 is_cgc = False
 arch = 0
-base = 0
-
-def set_base(_base):
-    if isinstance(_base, int):
-        base = _base
-    else:
-        raise TypeError("base must be a integer.")
+bits = 0
 
 def copy_to_clip(data):
     subprocess.call('echo|set /p="%s"|clip' % data, shell=True)
@@ -87,8 +81,8 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
         if self.action == ACTION_COPYEA:
             ea = ScreenEA()
             if ea != idaapi.BADADDR:
-                copy_to_clip("0x%X" % (base + ea))
-                print "Address 0x%X has been copied to clipboard" % (base + ea)
+                copy_to_clip("0x%X" % ea)
+                print "Address 0x%X has been copied to clipboard" % ea
         return 1
 
     def update(self, ctx):
@@ -240,7 +234,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
             op = GetMnem(addr).lower()
             dst = GetOpnd(addr, 0)
 
-            if op in ("call", "ret", "retn", "jmp", "bl", "blx") or addr < function_head:
+            if op in ("ret", "retn", "jmp", "bl") or addr < function_head:
                 return
 
             c = GetCommentEx(addr, 0)
@@ -249,23 +243,27 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 op_index = 1 if "," in GetDisasm(addr) else 0
                 break
             elif name.endswith(("snprintf_chk",)):
-                if op in ("mov", "lea") and dst in ("r8", "[esp+10h]"):
+                if op in ("mov", "lea") and dst.endswith(("r8", "[esp+10h]")):
                     op_index = 1
                     break
             elif name.endswith(("sprintf_chk",)):
-                if op in ("mov", "lea") and dst in ("rcx", "[esp+0Ch]", "R3"):
+                if op in ("mov", "lea") and ( dst.endswith(("rcx", "[esp+0Ch]", "R3")) or
+                                              dst.endswith("ecx") and bits == 64 ):
                     op_index = 1
                     break
             elif name.endswith(("snprintf", "fnprintf")):
-                if op in ("mov", "lea") and dst in ("rdx", "[esp+8]", "R2"):
+                if op in ("mov", "lea") and ( dst.endswith(("rdx", "[esp+8]", "R2")) or
+                                              dst.endswith("edx") and bits == 64 ):
                     op_index = 1
                     break
             elif name.endswith(("sprintf", "fprintf", "dprintf", "printf_chk")):
-                if op in ("mov", "lea") and dst in ("rsi", "[esp+4]", "R1"):
+                if op in ("mov", "lea") and ( dst.endswith(("rsi", "[esp+4]", "R1")) or
+                                              dst.endswith("esi") and bits == 64 ):
                     op_index = 1
                     break
             elif name.endswith("printf"):
-                if op in ("mov", "lea") and dst in ("rdi", "[esp]", "R0"):
+                if op in ("mov", "lea") and ( dst.endswith(("rdi", "[esp]", "R0")) or
+                                              dst.endswith("edi") and bits == 64 ):
                     op_index = 1
                     break
 
@@ -278,7 +276,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
             while True:
                 _addr = idc.PrevHead(_addr)
                 _op = GetMnem(_addr).lower()
-                if _op in ("call", "ret", "retn", "jmp", "bl", "blx") or _addr < function_head:
+                if _op in ("ret", "retn", "jmp", "b") or _addr < function_head:
                     break
                 elif _op in ("mov", "lea", "ldr") and GetOpnd(_addr, 0) == opnd:
                     op_type = GetOpType(_addr, 1)
@@ -315,8 +313,8 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             vdui = idaapi.get_tform_vdui(ctx.form)
             ea = vdui.item.get_ea()
             if ea != idaapi.BADADDR:
-                copy_to_clip("0x%X" % (base + ea))
-                print "Address 0x%X has been copied to clipboard" % (base + ea)
+                copy_to_clip("0x%X" % ea)
+                print "Address 0x%X has been copied to clipboard" % ea
         elif self.action == ACTION_HX_COPYNAME:
             name = idaapi.get_highlighted_identifier()
             if name:
@@ -445,8 +443,18 @@ class LazyIDA_t(idaapi.plugin_t):
         self.registered_hx_actions = []
 
         global arch
+        global bits
         global is_cgc
+
         arch = idaapi.ph_get_id()
+        info = idaapi.get_inf_structure()
+        if info.is_64bit():
+            bits = 64
+        elif info.is_32bit():
+            bits = 32
+        else:
+            bits = 16
+
         is_cgc = "CGC" in idaapi.get_file_type_name()
 
         print "LazyIDA (Python Version) (v1.0.0.1) plugin has been loaded."
