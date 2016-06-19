@@ -234,39 +234,35 @@ class menu_action_handler_t(idaapi.action_handler_t):
             op = GetMnem(addr).lower()
             dst = GetOpnd(addr, 0)
 
-            if op in ("ret", "retn", "jmp", "bl") or addr < function_head:
+            if op in ("ret", "retn", "jmp", "b") or addr < function_head:
                 return
 
             c = GetCommentEx(addr, 0)
             if c and c.lower() == "format":
-                # Get last opnd
-                op_index = 1 if "," in GetDisasm(addr) else 0
                 break
             elif name.endswith(("snprintf_chk",)):
-                if op in ("mov", "lea") and dst.endswith(("r8", "[esp+10h]")):
-                    op_index = 1
+                if op in ("mov", "lea") and dst.endswith(("r8", "r8d", "[esp+10h]")):
                     break
             elif name.endswith(("sprintf_chk",)):
                 if op in ("mov", "lea") and ( dst.endswith(("rcx", "[esp+0Ch]", "R3")) or
                                               dst.endswith("ecx") and bits == 64 ):
-                    op_index = 1
                     break
             elif name.endswith(("snprintf", "fnprintf")):
                 if op in ("mov", "lea") and ( dst.endswith(("rdx", "[esp+8]", "R2")) or
                                               dst.endswith("edx") and bits == 64 ):
-                    op_index = 1
                     break
             elif name.endswith(("sprintf", "fprintf", "dprintf", "printf_chk")):
                 if op in ("mov", "lea") and ( dst.endswith(("rsi", "[esp+4]", "R1")) or
                                               dst.endswith("esi") and bits == 64 ):
-                    op_index = 1
                     break
             elif name.endswith("printf"):
                 if op in ("mov", "lea") and ( dst.endswith(("rdi", "[esp]", "R0")) or
                                               dst.endswith("edi") and bits == 64 ):
-                    op_index = 1
                     break
 
+        # format arg found, check its type and value
+        # get last oprend
+        op_index = GetDisasm(addr).count(",")
         op_type = GetOpType(addr, op_index)
         opnd = GetOpnd(addr, op_index)
 
@@ -394,7 +390,9 @@ class UI_Hook(idaapi.UI_Hooks):
                 for action in ACTION_CONVERT:
                     idaapi.attach_action_to_popup(form, popup, action, "Convert/")
 
-        if form_type == idaapi.BWN_DISASM and arch in (idaapi.PLFM_386, idaapi.PLFM_ARM):
+        if form_type == idaapi.BWN_DISASM and (arch, bits) in [(idaapi.PLFM_386, 32),
+                                                               (idaapi.PLFM_386, 64),
+                                                               (idaapi.PLFM_ARM, 32),]:
             idaapi.attach_action_to_popup(form, popup, ACTION_SCANVUL, None)
 
 class IDB_Hook(idaapi.IDB_Hooks):
