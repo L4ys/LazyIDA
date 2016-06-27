@@ -11,31 +11,9 @@ ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
 ACTION_HX_COPYNAME = "lazyida:hx_copyname"
 
-cgc_syscall_map = {
-    "LINUX - sys_exit": "CGC - _terminate",
-    "LINUX - sys_fork": "CGC - transmit",
-    "LINUX - sys_read": "CGC - receive",
-    "LINUX - sys_write": "CGC - fdwait",
-    "LINUX - sys_open": "CGC - allocate",
-    "LINUX - sys_close": "CGC - deallocate",
-    "LINUX - sys_waitpid": "CGC - random",
-    "LINUX - ": "CGC - receive",
-}
-
-cgc_syscall_type_map = {
-    "__terminate": "void _terminate(int status);",
-    "_transmit": "int transmit(int fd, const void *buf, size_t count, size_t *tx_bytes);",
-    "_receive": "int receive(int fd, void *buf, size_t count, size_t *rx_bytes);",
-    "_fdwait": "int fdwait(int nfds, fd_set *readfds, fd_set *writefds, const struct timeval *timeout, int *readyfds);",
-    "_allocate": "int allocate(size_t length, int is_X, void **addr);",
-    "_deallocate": "int deallocate(void *addr, size_t length);",
-    "_random": "int random(void *buf, size_t count, size_t *rnd_bytes);",
-}
-
 u32 = lambda x: unpack("<I", x)[0]
 u64 = lambda x: unpack("<Q", x)[0]
 
-is_cgc = False
 arch = 0
 bits = 0
 
@@ -323,10 +301,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
 
     def update(self, ctx):
         vdui = idaapi.get_tform_vdui(ctx.form)
-        if vdui:
-            return idaapi.AST_ENABLE_FOR_FORM
-        else:
-            return idaapi.AST_DISABLE_FOR_FORM
+        return idaapi.AST_ENABLE_FOR_FORM if vdui else idaapi.AST_DISABLE_FOR_FORM
 
     @staticmethod
     def remove_rettype(vu):
@@ -363,9 +338,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 return True
 
             # Create new function info with void rettype
-            new_ret_type = idaapi.tinfo_t()
-            new_ret_type.create_simple_type(idaapi.BT_VOID)
-            fi.rettype = new_ret_type
+            fi.rettype = idaapi.tinfo_t(idaapi.BT_VOID)
 
             # Create new function type with function info
             new_func_type = idaapi.tinfo_t()
@@ -395,38 +368,14 @@ class UI_Hook(idaapi.UI_Hooks):
                                                                (idaapi.PLFM_ARM, 32),]:
             idaapi.attach_action_to_popup(form, popup, ACTION_SCANVUL, None)
 
-class IDB_Hook(idaapi.IDB_Hooks):
-    def __init__(self):
-        idaapi.IDB_Hooks.__init__(self)
+class HexRays_Hook():
+    def callback(self, event, *args):
+        if event == idaapi.hxe_populating_popup:
+            form, phandle, vu = args
+            if vu.item.citype == idaapi.VDI_FUNC or ( vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr() ):
+                idaapi.attach_action_to_popup(form, phandle, ACTION_HX_REMOVERETTYPE, None)
 
-    def cmt_changed(self, ea, repeatable):
-        if is_cgc:
-            # fix cgc syscall comment
-            cmt = GetCommentEx(ea, 0)
-            if cmt and "LINUX - " in cmt:
-                if cgc_syscall_map.has_key(cmt):
-                    print "[+] 0x%X: Fix CGC syscall comment: %s" % (ea, GetCommentEx(ea, 0))
-                    MakeComm(ea, cgc_syscall_map[cmt])
         return 0
-
-class IDP_Hook(idaapi.IDP_Hooks):
-    def __init__(self):
-        idaapi.IDP_Hooks.__init__(self)
-
-    def renamed(self, ea, new_name, local_name):
-        if is_cgc:
-            # fix cgc syscall type
-            if cgc_syscall_type_map.has_key(new_name):
-                SetType(ea, cgc_syscall_type_map[new_name])
-                print "[+] 0x%X: Fix CGC syscall type: %s" % (ea, new_name)
-
-def hexrays_callback(event, *args):
-    if event == idaapi.hxe_populating_popup:
-        form, phandle, vu = args
-        if vu.item.citype == idaapi.VDI_FUNC or ( vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr() ):
-            idaapi.attach_action_to_popup(form, phandle, ACTION_HX_REMOVERETTYPE, None)
-
-    return 0
 
 class LazyIDA_t(idaapi.plugin_t):
     flags = idaapi.PLUGIN_HIDE
@@ -442,7 +391,6 @@ class LazyIDA_t(idaapi.plugin_t):
 
         global arch
         global bits
-        global is_cgc
 
         arch = idaapi.ph_get_id()
         info = idaapi.get_inf_structure()
@@ -452,8 +400,6 @@ class LazyIDA_t(idaapi.plugin_t):
             bits = 32
         else:
             bits = 16
-
-        is_cgc = "CGC" in idaapi.get_file_type_name()
 
         print "LazyIDA (Python Version) (v1.0.0.1) plugin has been loaded."
 
@@ -486,14 +432,6 @@ class LazyIDA_t(idaapi.plugin_t):
         self.ui_hook = UI_Hook()
         self.ui_hook.hook()
 
-        # Add idb hook
-        self.idb_hook = IDB_Hook()
-        self.idb_hook.hook()
-
-        # Add idp hook
-        self.idp_hook = IDP_Hook()
-        self.idp_hook.hook()
-
         # Add hexrays ui callback
         if idaapi.init_hexrays_plugin():
             hx_actions = (
@@ -505,13 +443,9 @@ class LazyIDA_t(idaapi.plugin_t):
                 idaapi.register_action(action)
                 self.registered_hx_actions.append(action.name)
 
-            idaapi.install_hexrays_callback(hexrays_callback)
+            self.hx_hook = HexRays_Hook()
+            idaapi.install_hexrays_callback(self.hx_hook.callback)
             self.hexrays_inited = True
-
-        # Auto apply libcgc signature
-        if is_cgc and os.path.exists(idaapi.get_sig_filename("libcgc.sig")):
-            if "libcgc.sig" not in [idaapi.get_idasgn_desc(i)[0] for i in range(idaapi.get_idasgn_qty())]:
-                idaapi.plan_to_apply_idasgn("libcgc.sig")
 
         return idaapi.PLUGIN_KEEP
 
@@ -521,10 +455,6 @@ class LazyIDA_t(idaapi.plugin_t):
     def term(self):
         if self.ui_hook:
             self.ui_hook.unhook()
-        if self.idb_hook:
-            self.idb_hook.unhook()
-        if self.idp_hook:
-            self.idp_hook.unhook()
 
         # Unregister actions
         for action in self.registered_actions:
@@ -534,8 +464,8 @@ class LazyIDA_t(idaapi.plugin_t):
             # Unregister hexrays actions
             for action in self.registered_hx_actions:
                 idaapi.unregister_action(action)
-
-            idaapi.remove_hexrays_callback(hexrays_callback)
+            if self.hx_hook:
+                idaapi.remove_hexrays_callback(self.hx_hook.callback)
             idaapi.term_hexrays_plugin()
 
 def PLUGIN_ENTRY():
