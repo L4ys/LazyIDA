@@ -15,7 +15,7 @@ Make your IDA Lazy!
 ![2016-06-12 11 03 18](https://cloud.githubusercontent.com/assets/5360374/15991863/e5271146-30f1-11e6-89ac-bafd46eb1e45.png)
   - Scan for format string vulnerabilities:
   
-![2016-06-15 8 13 56](https://cloud.githubusercontent.com/assets/5360374/16064130/2ae49ba0-32d1-11e6-8668-5799b12e273d.png)
+![2016-06-15 8 19 03](https://cloud.githubusercontent.com/assets/5360374/16064234/da39aa8c-32d1-11e6-89b8-1709cef270f5.png)
   - Lazy shortcuts:
     - Disasm Window: 
       - `w`: Copy address of current line into clipboard
