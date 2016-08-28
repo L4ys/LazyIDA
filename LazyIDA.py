@@ -1,6 +1,7 @@
 import idaapi
 import subprocess
 from struct import unpack
+from PySide import QtGui
 
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(8)]
 ACTION_SCANVUL = "lazyida:scanvul"
@@ -18,7 +19,7 @@ arch = 0
 bits = 0
 
 def copy_to_clip(data):
-    subprocess.call('echo|set /p="%s"|clip' % data, shell=True)
+    QtGui.QApplication.clipboard().setText(data)
 
 class VulnChoose(Choose2):
     """
