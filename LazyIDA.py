@@ -3,15 +3,17 @@ import subprocess
 from struct import unpack
 from PySide import QtGui
 
-ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(8)]
+ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
 ACTION_XORDATA = "lazyida:xordata"
+ACTION_FILLNOP = "lazyida:fillnop"
 
 ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
 ACTION_HX_COPYNAME = "lazyida:hx_copyname"
 
+u16 = lambda x: unpack("<H", x)[0]
 u32 = lambda x: unpack("<I", x)[0]
 u64 = lambda x: unpack("<Q", x)[0]
 
@@ -113,6 +115,20 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     output += "\n};"
                     print output
                 elif self.action == ACTION_CONVERT[3]:
+                    # C array word
+                    data += "\x00"
+                    array_size = (size + 1) / 2
+                    output = "unsigned short data[%d] = {" % array_size
+                    j = 0
+                    for i in range(0, size, 2):
+                        if j % 8 == 0:
+                            output += "\n    "
+                        j += 1
+                        output += "0x%04X, " % u16(data[i:i+2])
+                    output = output[:-2]
+                    output += "\n};"
+                    print output
+                elif self.action == ACTION_CONVERT[4]:
                     # C array dword
                     data += "\x00" * 3
                     array_size = (size + 3) / 4
@@ -126,7 +142,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     output = output[:-2]
                     output += "\n};"
                     print output
-                elif self.action == ACTION_CONVERT[4]:
+                elif self.action == ACTION_CONVERT[5]:
                     # C array qword
                     data += "\x00" * 7
                     array_size = (size + 7) / 8
@@ -140,20 +156,27 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     output = output[:-2]
                     output += "\n};"
                     print output.replace("0X", "0x")
-                elif self.action == ACTION_CONVERT[5]:
+                elif self.action == ACTION_CONVERT[6]:
                     # python list
                     output = "["
                     output += ",".join("0x%02X" % ord(b) for b in data)
                     output += "]"
                     print output
-                elif self.action == ACTION_CONVERT[6]:
+                elif self.action == ACTION_CONVERT[7]:
+                    # python list word
+                    data += "\x00"
+                    output = "["
+                    output += ",".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2))
+                    output += "]"
+                    print output
+                elif self.action == ACTION_CONVERT[8]:
                     # python list dword
                     data += "\x00" * 3
                     output = "["
                     output += ",".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4))
                     output += "]"
                     print output
-                elif self.action == ACTION_CONVERT[7]:
+                elif self.action == ACTION_CONVERT[9]:
                     # python list qword
                     data += "\x00" * 7
                     output = "["
@@ -175,7 +198,11 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 x &= 0xFF
                 print "\n[+] Xor 0x%X - 0x%X (%u bytes) with 0x%02X:" % ( start, end, end - start, x )
                 print repr("".join(chr(ord(b) ^ x) for b in data))
-
+        elif self.action == ACTION_FILLNOP:
+            selection, start, end = idaapi.read_selection()
+            if selection:
+                idaapi.patch_many_bytes(start, "\x90" * (end - start))
+                print "\n[+] Fill 0x%X - 0x%X (%u bytes) with NOPs" % ( start, end, end - start )
         elif self.action == ACTION_SCANVUL:
             print "\n[+] Finding Format String Vulnerability..."
             found = []
@@ -361,6 +388,7 @@ class UI_Hook(idaapi.UI_Hooks):
         if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
             if idaapi.read_selection() or ItemSize(ScreenEA()) > 1:
                 idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
+                idaapi.attach_action_to_popup(form, popup, ACTION_FILLNOP, None)
                 for action in ACTION_CONVERT:
                     idaapi.attach_action_to_popup(form, popup, action, "Convert/")
 
@@ -409,12 +437,15 @@ class LazyIDA_t(idaapi.plugin_t):
             idaapi.action_desc_t(ACTION_CONVERT[0], "Convert to string", menu_action_handler_t(ACTION_CONVERT[0]), None, None, 80),
             idaapi.action_desc_t(ACTION_CONVERT[1], "Convert to hex string", menu_action_handler_t(ACTION_CONVERT[1]), None, None, 8),
             idaapi.action_desc_t(ACTION_CONVERT[2], "Convert to C/C++ array (BYTE)", menu_action_handler_t(ACTION_CONVERT[2]), None, None, 38),
-            idaapi.action_desc_t(ACTION_CONVERT[3], "Convert to C/C++ array (DWORD)", menu_action_handler_t(ACTION_CONVERT[3]), None, None, 38),
-            idaapi.action_desc_t(ACTION_CONVERT[4], "Convert to C/C++ array (QWORD)", menu_action_handler_t(ACTION_CONVERT[4]), None, None, 38),
-            idaapi.action_desc_t(ACTION_CONVERT[5], "Convert to python list (BYTE)", menu_action_handler_t(ACTION_CONVERT[5]), None, None, 201),
-            idaapi.action_desc_t(ACTION_CONVERT[6], "Convert to python list (DWORD)", menu_action_handler_t(ACTION_CONVERT[6]), None, None, 201),
-            idaapi.action_desc_t(ACTION_CONVERT[7], "Convert to python list (QWORD)", menu_action_handler_t(ACTION_CONVERT[7]), None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[3], "Convert to C/C++ array (WORD)", menu_action_handler_t(ACTION_CONVERT[3]), None, None, 38),
+            idaapi.action_desc_t(ACTION_CONVERT[4], "Convert to C/C++ array (DWORD)", menu_action_handler_t(ACTION_CONVERT[4]), None, None, 38),
+            idaapi.action_desc_t(ACTION_CONVERT[5], "Convert to C/C++ array (QWORD)", menu_action_handler_t(ACTION_CONVERT[5]), None, None, 38),
+            idaapi.action_desc_t(ACTION_CONVERT[6], "Convert to python list (BYTE)", menu_action_handler_t(ACTION_CONVERT[6]), None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[7], "Convert to python list (WORD)", menu_action_handler_t(ACTION_CONVERT[7]), None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[8], "Convert to python list (DWORD)", menu_action_handler_t(ACTION_CONVERT[8]), None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[9], "Convert to python list (QWORD)", menu_action_handler_t(ACTION_CONVERT[9]), None, None, 201),
             idaapi.action_desc_t(ACTION_XORDATA, "Get xored data", menu_action_handler_t(ACTION_XORDATA), None, None, 9),
+            idaapi.action_desc_t(ACTION_FILLNOP, "Fill with NOPs", menu_action_handler_t(ACTION_FILLNOP), None, None, 9),
             idaapi.action_desc_t(ACTION_SCANVUL, "Scan format string vulnerabilities", menu_action_handler_t(ACTION_SCANVUL), None, None, 160),
         )
         for action in menu_actions:
