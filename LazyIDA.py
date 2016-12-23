@@ -1,5 +1,4 @@
 import idaapi
-import subprocess
 from struct import unpack
 from PySide import QtGui
 
@@ -13,15 +12,23 @@ ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
 ACTION_HX_COPYNAME = "lazyida:hx_copyname"
 
+NETNODE_NAME = "$ lazyida-hx-remove_rettype"
+
 u16 = lambda x: unpack("<H", x)[0]
 u32 = lambda x: unpack("<I", x)[0]
 u64 = lambda x: unpack("<Q", x)[0]
 
 arch = 0
 bits = 0
+node = idaapi.netnode()
+ret_type = {}
 
 def copy_to_clip(data):
     QtGui.QApplication.clipboard().setText(data)
+
+def save_ret_type(addr, type):
+    ret_type[addr] = type;
+    node.setblob(repr(ret_type), 0, 'I')
 
 class VulnChoose(Choose2):
     """
@@ -363,10 +370,17 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
         if ea != idaapi.BADADDR and old_func_type.get_func_details(fi):
             # Return type is already void
             if fi.rettype.is_decl_void():
-                return True
+                # Restore ret type
+                if ea not in ret_type:
+                    return True
+                ret = ret_type[ea]
+            else:
+                # Save ret type and change it to void
+                ret_type[ea] = fi.rettype
+                ret = idaapi.BT_VOID
 
-            # Create new function info with void rettype
-            fi.rettype = idaapi.tinfo_t(idaapi.BT_VOID)
+            # Create new function info with new rettype
+            fi.rettype = idaapi.tinfo_t(ret)
 
             # Create new function type with function info
             new_func_type = idaapi.tinfo_t()
@@ -420,7 +434,6 @@ class LazyIDA_t(idaapi.plugin_t):
 
         global arch
         global bits
-
         arch = idaapi.ph_get_id()
         info = idaapi.get_inf_structure()
         if info.is_64bit():
@@ -429,6 +442,14 @@ class LazyIDA_t(idaapi.plugin_t):
             bits = 32
         else:
             bits = 16
+
+        global node
+        global ret_type
+        if not node.create(NETNODE_NAME):
+            # node exists
+            data = node.getblob(0, 'I')
+            if data:
+                ret_type = eval(data)
 
         print "LazyIDA (Python Version) (v1.0.0.1) plugin has been loaded."
 
