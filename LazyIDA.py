@@ -1,6 +1,11 @@
 import idaapi
 from struct import unpack
-from PySide import QtGui
+
+IDA7 = idaapi.IDA_SDK_VERSION >= 700
+if IDA7:
+    from PyQt5.Qt import QApplication
+else:
+    from PySide.QtGui import QApplication
 
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
@@ -24,7 +29,7 @@ node = idaapi.netnode()
 ret_type = {}
 
 def copy_to_clip(data):
-    QtGui.QApplication.clipboard().setText(data)
+    QApplication.clipboard().setText(data)
 
 def save_ret_type(addr, type):
     ret_type[addr] = type;
@@ -315,12 +320,14 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
 
     def activate(self, ctx):
         if self.action == ACTION_HX_REMOVERETTYPE:
-            vdui = idaapi.get_tform_vdui(ctx.form)
+            if IDA7:
+                vdui = idaapi.get_widget_vdui(ctx.widget)
+            else:
+                vdui = idaapi.get_tform_vdui(ctx.form)
             self.remove_rettype(vdui)
             vdui.refresh_ctext()
         elif self.action == ACTION_HX_COPYEA:
-            vdui = idaapi.get_tform_vdui(ctx.form)
-            ea = vdui.item.get_ea()
+            ea = idaapi.get_screen_ea()
             if ea != idaapi.BADADDR:
                 copy_to_clip("0x%X" % ea)
                 print "Address 0x%X has been copied to clipboard" % ea
@@ -335,8 +342,13 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
         return 1
 
     def update(self, ctx):
-        vdui = idaapi.get_tform_vdui(ctx.form)
-        return idaapi.AST_ENABLE_FOR_FORM if vdui else idaapi.AST_DISABLE_FOR_FORM
+        if IDA7:
+            vdui = idaapi.get_widget_vdui(ctx.widget)
+            return idaapi.AST_ENABLE_FOR_WIDGET if vdui else idaapi.AST_DISABLE_FOR_WIDGET
+        else:
+            vdui = idaapi.get_tform_vdui(ctx.form)
+            return idaapi.AST_ENABLE_FOR_FORM if vdui else idaapi.AST_DISABLE_FOR_FORM
+
 
     @staticmethod
     def remove_rettype(vu):
@@ -451,7 +463,7 @@ class LazyIDA_t(idaapi.plugin_t):
             if data:
                 ret_type = eval(data)
 
-        print "LazyIDA (Python Version) (v1.0.0.1) plugin has been loaded."
+        print "LazyIDA (Python Version) (v1.0.0.2) plugin has been loaded."
 
         # Register menu actions
         menu_actions = (
