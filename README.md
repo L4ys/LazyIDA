@@ -4,7 +4,7 @@ Make your IDA Lazy!
 # Install
 1. put `LazyIDA.py` into `plugins` folder under your IDA Pro installation path.
 
-#Features
+# Features
   - Remove function return type in Hex-Rays:
   
 ![2016-06-12 11 05 29](https://cloud.githubusercontent.com/assets/5360374/15991889/2dad5d62-30f2-11e6-8d4b-e4efb0b73c77.png)
