@@ -333,7 +333,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 print "Address 0x%X has been copied to clipboard" % ea
         elif self.action == ACTION_HX_COPYNAME:
             if IDA7:
-                idaapi.get_highlight(idaapi.get_current_viewer())[0]
+                name = idaapi.get_highlight(idaapi.get_current_viewer())[0]
             else:
                 name = idaapi.get_highlighted_identifier()
             if name:
