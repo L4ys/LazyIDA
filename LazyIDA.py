@@ -1,12 +1,12 @@
 import idaapi
 from struct import unpack
 
-IDA7 = idaapi.IDA_SDK_VERSION >= 700
-if IDA7:
+if idaapi.IDA_SDK_VERSION >= 690:
     from PyQt5.Qt import QApplication
 else:
     from PySide.QtGui import QApplication
 
+IDA7 = idaapi.IDA_SDK_VERSION >= 700
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
