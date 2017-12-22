@@ -7,7 +7,7 @@ else:
     from PySide.QtGui import QApplication
 
 IDA7 = idaapi.IDA_SDK_VERSION >= 700
-ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
+ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(14)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
 ACTION_XORDATA = "lazyida:xordata"
@@ -194,6 +194,60 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     output = "["
                     output += ",".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8))
                     output += "]"
+                    print output.replace("0X", "0x")
+                elif self.action == ACTION_CONVERT[10]:
+                    # java byte array
+                    output = "byte[] data = new byte[] {"
+                    j = 0
+                    for i in range(size):
+                        if j % 8 == 0:
+                            output += "\n    "
+                        j += 1
+                        output += "(byte) 0x%02x, " % ord(data[i])
+                    output = output[:-2]
+                    output += "\n};"
+                    print output
+                elif self.action == ACTION_CONVERT[11]:
+                    # java short array
+                    data += "\x00"
+                    array_size = (size + 1) / 2
+                    output = "short[] data = new short[] {"
+                    j = 0
+                    for i in range(0, size, 2):
+                        if j % 8 == 0:
+                            output += "\n    "
+                        j += 1
+                        output += "(short) 0x%04x, " % u16(data[i:i+2])
+                    output = output[:-2]
+                    output += "\n};"
+                    print output
+                elif self.action == ACTION_CONVERT[12]:
+                    # java int array
+                    data += "\x00" * 3
+                    array_size = (size + 3) / 4
+                    output = "int[] data = new int[] {"
+                    j = 0
+                    for i in range(0, size, 4):
+                        if j % 8 == 0:
+                            output += "\n    "
+                        j += 1
+                        output += "0x%08x, " % u32(data[i:i+4])
+                    output = output[:-2]
+                    output += "\n};"
+                    print output
+                elif self.action == ACTION_CONVERT[13]:
+                    # java long array
+                    data += "\x00" * 7
+                    array_size = (size + 7) / 8
+                    output = "long[] data = new long[] {"
+                    j = 0
+                    for i in range(0, size, 8):
+                        if j % 4 == 0:
+                            output += "\n    "
+                        j += 1
+                        output += "%#018xL, " % u64(data[i:i+8])
+                    output = output[:-2]
+                    output += "\n};"
                     print output.replace("0X", "0x")
         elif self.action == ACTION_XORDATA:
             selection, start, end = idaapi.read_selection()
@@ -480,6 +534,10 @@ class LazyIDA_t(idaapi.plugin_t):
             idaapi.action_desc_t(ACTION_CONVERT[7], "Convert to python list (WORD)", menu_action_handler_t(ACTION_CONVERT[7]), None, None, 201),
             idaapi.action_desc_t(ACTION_CONVERT[8], "Convert to python list (DWORD)", menu_action_handler_t(ACTION_CONVERT[8]), None, None, 201),
             idaapi.action_desc_t(ACTION_CONVERT[9], "Convert to python list (QWORD)", menu_action_handler_t(ACTION_CONVERT[9]), None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[10], "Convert to java array (BYTE)", menu_action_handler_t(ACTION_CONVERT[10]), None, None, 15),
+            idaapi.action_desc_t(ACTION_CONVERT[11], "Convert to java array (WORD)", menu_action_handler_t(ACTION_CONVERT[11]), None, None, 15),
+            idaapi.action_desc_t(ACTION_CONVERT[12], "Convert to java array (DWORD)", menu_action_handler_t(ACTION_CONVERT[12]), None, None, 15),
+            idaapi.action_desc_t(ACTION_CONVERT[13], "Convert to java array (QWORD)", menu_action_handler_t(ACTION_CONVERT[13]), None, None, 15),
             idaapi.action_desc_t(ACTION_XORDATA, "Get xored data", menu_action_handler_t(ACTION_XORDATA), None, None, 9),
             idaapi.action_desc_t(ACTION_FILLNOP, "Fill with NOPs", menu_action_handler_t(ACTION_FILLNOP), None, None, 9),
             idaapi.action_desc_t(ACTION_SCANVUL, "Scan format string vulnerabilities", menu_action_handler_t(ACTION_SCANVUL), None, None, 160),
