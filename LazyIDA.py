@@ -432,7 +432,25 @@ class HexRays_Hook():
             form, phandle, vu = args
             if vu.item.citype == idaapi.VDI_FUNC or ( vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr() ):
                 idaapi.attach_action_to_popup(form, phandle, ACTION_HX_REMOVERETTYPE, None)
+        elif event == idaapi.hxe_double_click:
+            vu, shift_state = args
+            # auto jump to target if clicked item is xxx->func();
+            if vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr():
+                expr = tag_remove(vu.item.e.print1(None))
+                if "->" in expr:
+                    # find target function
+                    name = expr.split("->")[-1]
+                    addr = LocByName(name)
+                    if addr == idaapi.BADADDR:
+                        # try class::function
+                        e = vu.item.e
+                        while e.x:
+                            e = e.x
+                        addr = LocByName("%s::%s" % (str(e.type).split()[0], name))
 
+                    if addr != idaapi.BADADDR:
+                        Jump(addr)
+                        return 1
         return 0
 
 class LazyIDA_t(idaapi.plugin_t):
@@ -466,7 +484,7 @@ class LazyIDA_t(idaapi.plugin_t):
             if data:
                 ret_type = eval(data)
 
-        print "LazyIDA (Python Version) (v1.0.0.2) plugin has been loaded."
+        print "LazyIDA (v1.0.0.3) plugin has been loaded."
 
         # Register menu actions
         menu_actions = (
@@ -502,6 +520,14 @@ class LazyIDA_t(idaapi.plugin_t):
 
         # Add hexrays ui callback
         if idaapi.init_hexrays_plugin():
+            addon = idaapi.addon_info_t()
+            addon.id = "tw.l4ys.lazyida";
+            addon.name = "LazyIDA";
+            addon.producer = "Lays";
+            addon.url = "https://github.com/L4ys/LazyIDA";
+            addon.version = "1.0.0.3";
+            idaapi.register_addon(addon)
+
             hx_actions = (
                 idaapi.action_desc_t(ACTION_HX_REMOVERETTYPE, "Remove return type", hexrays_action_handler_t(ACTION_HX_REMOVERETTYPE), "v"),
                 idaapi.action_desc_t(ACTION_HX_COPYEA , "Copy ea", hexrays_action_handler_t(ACTION_HX_COPYEA), "w"),
