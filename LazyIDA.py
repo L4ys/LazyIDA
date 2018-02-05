@@ -1,4 +1,5 @@
 import idaapi
+import ast
 from struct import unpack
 
 if idaapi.IDA_SDK_VERSION >= 690:
@@ -17,30 +18,22 @@ ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
 ACTION_HX_COPYNAME = "lazyida:hx_copyname"
 
-NETNODE_NAME = "$ lazyida-hx-remove_rettype"
-
 u16 = lambda x: unpack("<H", x)[0]
 u32 = lambda x: unpack("<I", x)[0]
 u64 = lambda x: unpack("<Q", x)[0]
 
 arch = 0
 bits = 0
-node = idaapi.netnode()
-ret_type = {}
 
 def copy_to_clip(data):
     QApplication.clipboard().setText(data)
-
-def save_ret_type(addr, type):
-    ret_type[addr] = type;
-    node.setblob(repr(ret_type), 0, 'I')
 
 class VulnChoose(Choose2):
     """
     Chooser class to display result of format string vuln scan
     """
     def __init__(self, title, items, icon, embedded=False):
-        Choose2.__init__(self, title, [["Address", 20], ["Function", 30], ["Format",30]], embedded=embedded)
+        Choose2.__init__(self, title, [["Address", 20], ["Function", 30], ["Format", 30]], embedded=embedded)
         self.items = items
         self.icon = 45
 
@@ -317,6 +310,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
     def __init__(self, action):
         idaapi.action_handler_t.__init__(self)
         self.action = action
+        self.ret_type = {}
 
     def activate(self, ctx):
         if self.action == ACTION_HX_REMOVERETTYPE:
@@ -352,16 +346,13 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             vdui = idaapi.get_tform_vdui(ctx.form)
             return idaapi.AST_ENABLE_FOR_FORM if vdui else idaapi.AST_DISABLE_FOR_FORM
 
-
-    @staticmethod
-    def remove_rettype(vu):
+    def remove_rettype(self, vu):
         if vu.item.citype == idaapi.VDI_FUNC:
             # current function
             ea = vu.cfunc.entry_ea
             old_func_type = idaapi.tinfo_t()
             if not vu.cfunc.get_func_type(old_func_type):
                 return False
-
         elif vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr():
             # call xxx
             ea = vu.item.get_ea()
@@ -386,12 +377,12 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             # Return type is already void
             if fi.rettype.is_decl_void():
                 # Restore ret type
-                if ea not in ret_type:
+                if ea not in self.ret_type:
                     return True
-                ret = ret_type[ea]
+                ret = self.ret_type[ea]
             else:
                 # Save ret type and change it to void
-                ret_type[ea] = fi.rettype
+                self.ret_type[ea] = fi.rettype;
                 ret = idaapi.BT_VOID
 
             # Create new function info with new rettype
@@ -475,14 +466,6 @@ class LazyIDA_t(idaapi.plugin_t):
             bits = 32
         else:
             bits = 16
-
-        global node
-        global ret_type
-        if not node.create(NETNODE_NAME):
-            # node exists
-            data = node.getblob(0, 'I')
-            if data:
-                ret_type = eval(data)
 
         print "LazyIDA (v1.0.0.3) plugin has been loaded."
 
