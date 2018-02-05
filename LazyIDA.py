@@ -1,6 +1,5 @@
-import idaapi
-import ast
 from struct import unpack
+import idaapi
 
 if idaapi.IDA_SDK_VERSION >= 690:
     from PyQt5.Qt import QApplication
@@ -22,8 +21,8 @@ u16 = lambda x: unpack("<H", x)[0]
 u32 = lambda x: unpack("<I", x)[0]
 u64 = lambda x: unpack("<Q", x)[0]
 
-arch = 0
-bits = 0
+ARCH = 0
+BITS = 0
 
 def copy_to_clip(data):
     QApplication.clipboard().setText(data)
@@ -96,98 +95,75 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 return False
 
             data = idaapi.get_many_bytes(start, size)
+            name = Name(start)
+            if not name:
+                name = "data"
             if data:
-                print "\n[+] Dump 0x%X - 0x%X (%u bytes) :" % ( start, end, size )
+                print "\n[+] Dump 0x%X - 0x%X (%u bytes) :" % (start, end, size)
                 if self.action == ACTION_CONVERT[0]:
                     # escaped string
-                    output = '"'
-                    output += "".join("\\x%02X" % ord(b) for b in data)
-                    output += '"'
-                    print output
+                    print '"%s"' % "".join("\\x%02X" % ord(b) for b in data)
                 elif self.action == ACTION_CONVERT[1]:
                     # hex string
                     print "".join("%02X" % ord(b) for b in data)
                 elif self.action == ACTION_CONVERT[2]:
                     # C array
-                    output = "unsigned char data[%d] = {" % size
-                    j = 0
+                    output = "unsigned char %s[%d] = {" % (name, size)
                     for i in range(size):
-                        if j % 16 == 0:
+                        if i % 16 == 0:
                             output += "\n    "
-                        j += 1
                         output += "0x%02X, " % ord(data[i])
-                    output = output[:-2]
-                    output += "\n};"
+                    output = output[:-2] + "\n};"
                     print output
                 elif self.action == ACTION_CONVERT[3]:
                     # C array word
                     data += "\x00"
                     array_size = (size + 1) / 2
-                    output = "unsigned short data[%d] = {" % array_size
-                    j = 0
+                    output = "unsigned short %s[%d] = {" % (name, array_size)
                     for i in range(0, size, 2):
-                        if j % 8 == 0:
+                        if i % 16 == 0:
                             output += "\n    "
-                        j += 1
                         output += "0x%04X, " % u16(data[i:i+2])
-                    output = output[:-2]
-                    output += "\n};"
+                    output = output[:-2] + "\n};"
                     print output
                 elif self.action == ACTION_CONVERT[4]:
                     # C array dword
                     data += "\x00" * 3
                     array_size = (size + 3) / 4
-                    output = "unsigned int data[%d] = {" % array_size
-                    j = 0
+                    output = "unsigned int %s[%d] = {" % (name, array_size)
                     for i in range(0, size, 4):
-                        if j % 8 == 0:
+                        if i % 32 == 0:
                             output += "\n    "
-                        j += 1
                         output += "0x%08X, " % u32(data[i:i+4])
-                    output = output[:-2]
-                    output += "\n};"
+                    output = output[:-2] + "\n};"
                     print output
                 elif self.action == ACTION_CONVERT[5]:
                     # C array qword
                     data += "\x00" * 7
                     array_size = (size + 7) / 8
-                    output = "unsigned long data[%d] = {" % array_size
-                    j = 0
+                    output = "unsigned long %s[%d] = {" % (name, array_size)
                     for i in range(0, size, 8):
-                        if j % 4 == 0:
+                        if i % 32 == 0:
                             output += "\n    "
-                        j += 1
                         output += "%#018X, " % u64(data[i:i+8])
-                    output = output[:-2]
-                    output += "\n};"
+                    output = output[:-2] + "\n};"
                     print output.replace("0X", "0x")
                 elif self.action == ACTION_CONVERT[6]:
                     # python list
-                    output = "["
-                    output += ",".join("0x%02X" % ord(b) for b in data)
-                    output += "]"
-                    print output
+                    print "[%s]" % ", ".join("0x%02X" % ord(b) for b in data)
                 elif self.action == ACTION_CONVERT[7]:
                     # python list word
                     data += "\x00"
-                    output = "["
-                    output += ",".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2))
-                    output += "]"
+                    print "[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2))
                     print output
                 elif self.action == ACTION_CONVERT[8]:
                     # python list dword
                     data += "\x00" * 3
-                    output = "["
-                    output += ",".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4))
-                    output += "]"
-                    print output
+                    print "[%s]" % ", ".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4))
                 elif self.action == ACTION_CONVERT[9]:
                     # python list qword
                     data += "\x00" * 7
-                    output = "["
-                    output += ",".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8))
-                    output += "]"
-                    print output.replace("0X", "0x")
+                    print "[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x")
         elif self.action == ACTION_XORDATA:
             selection, start, end = idaapi.read_selection()
             if not selection:
@@ -201,13 +177,13 @@ class menu_action_handler_t(idaapi.action_handler_t):
             x = AskLong(0, "Xor with...")
             if x:
                 x &= 0xFF
-                print "\n[+] Xor 0x%X - 0x%X (%u bytes) with 0x%02X:" % ( start, end, end - start, x )
+                print "\n[+] Xor 0x%X - 0x%X (%u bytes) with 0x%02X:" % (start, end, end - start, x)
                 print repr("".join(chr(ord(b) ^ x) for b in data))
         elif self.action == ACTION_FILLNOP:
             selection, start, end = idaapi.read_selection()
             if selection:
                 idaapi.patch_many_bytes(start, "\x90" * (end - start))
-                print "\n[+] Fill 0x%X - 0x%X (%u bytes) with NOPs" % ( start, end, end - start )
+                print "\n[+] Fill 0x%X - 0x%X (%u bytes) with NOPs" % (start, end, end - start)
         elif self.action == ACTION_SCANVUL:
             print "\n[+] Finding Format String Vulnerability..."
             found = []
@@ -255,20 +231,20 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 if op in ("mov", "lea") and dst.endswith(("r8", "r8d", "[esp+10h]")):
                     break
             elif name.endswith(("sprintf_chk",)):
-                if op in ("mov", "lea") and ( dst.endswith(("rcx", "[esp+0Ch]", "R3")) or
-                                              dst.endswith("ecx") and bits == 64 ):
+                if op in ("mov", "lea") and (dst.endswith(("rcx", "[esp+0Ch]", "R3")) or
+                                             dst.endswith("ecx") and BITS == 64):
                     break
             elif name.endswith(("snprintf", "fnprintf")):
-                if op in ("mov", "lea") and ( dst.endswith(("rdx", "[esp+8]", "R2")) or
-                                              dst.endswith("edx") and bits == 64 ):
+                if op in ("mov", "lea") and (dst.endswith(("rdx", "[esp+8]", "R2")) or
+                                             dst.endswith("edx") and BITS== 64):
                     break
             elif name.endswith(("sprintf", "fprintf", "dprintf", "printf_chk")):
-                if op in ("mov", "lea") and ( dst.endswith(("rsi", "[esp+4]", "R1")) or
-                                              dst.endswith("esi") and bits == 64 ):
+                if op in ("mov", "lea") and (dst.endswith(("rsi", "[esp+4]", "R1")) or
+                                             dst.endswith("esi") and BITS == 64):
                     break
             elif name.endswith("printf"):
-                if op in ("mov", "lea") and ( dst.endswith(("rdi", "[esp]", "R0")) or
-                                              dst.endswith("edi") and bits == 64 ):
+                if op in ("mov", "lea") and (dst.endswith(("rdi", "[esp]", "R0")) or
+                                             dst.endswith("edi") and BITS == 64):
                     break
 
         # format arg found, check its type and value
@@ -342,9 +318,8 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
         if IDA7:
             vdui = idaapi.get_widget_vdui(ctx.widget)
             return idaapi.AST_ENABLE_FOR_WIDGET if vdui else idaapi.AST_DISABLE_FOR_WIDGET
-        else:
-            vdui = idaapi.get_tform_vdui(ctx.form)
-            return idaapi.AST_ENABLE_FOR_FORM if vdui else idaapi.AST_DISABLE_FOR_FORM
+        vdui = idaapi.get_tform_vdui(ctx.form)
+        return idaapi.AST_ENABLE_FOR_FORM if vdui else idaapi.AST_DISABLE_FOR_FORM
 
     def remove_rettype(self, vu):
         if vu.item.citype == idaapi.VDI_FUNC:
@@ -382,7 +357,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 ret = self.ret_type[ea]
             else:
                 # Save ret type and change it to void
-                self.ret_type[ea] = fi.rettype;
+                self.ret_type[ea] = fi.rettype
                 ret = idaapi.BT_VOID
 
             # Create new function info with new rettype
@@ -412,16 +387,16 @@ class UI_Hook(idaapi.UI_Hooks):
                 for action in ACTION_CONVERT:
                     idaapi.attach_action_to_popup(form, popup, action, "Convert/")
 
-        if form_type == idaapi.BWN_DISASM and (arch, bits) in [(idaapi.PLFM_386, 32),
+        if form_type == idaapi.BWN_DISASM and (ARCH, BITS) in [(idaapi.PLFM_386, 32),
                                                                (idaapi.PLFM_386, 64),
                                                                (idaapi.PLFM_ARM, 32),]:
             idaapi.attach_action_to_popup(form, popup, ACTION_SCANVUL, None)
 
-class HexRays_Hook():
+class HexRays_Hook(object):
     def callback(self, event, *args):
         if event == idaapi.hxe_populating_popup:
             form, phandle, vu = args
-            if vu.item.citype == idaapi.VDI_FUNC or ( vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr() ):
+            if vu.item.citype == idaapi.VDI_FUNC or (vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr() and vu.item.e.type.is_funcptr()):
                 idaapi.attach_action_to_popup(form, phandle, ACTION_HX_REMOVERETTYPE, None)
         elif event == idaapi.hxe_double_click:
             vu, shift_state = args
@@ -456,16 +431,16 @@ class LazyIDA_t(idaapi.plugin_t):
         self.registered_actions = []
         self.registered_hx_actions = []
 
-        global arch
-        global bits
-        arch = idaapi.ph_get_id()
+        global ARCH
+        global BITS
+        ARCH = idaapi.ph_get_id()
         info = idaapi.get_inf_structure()
         if info.is_64bit():
-            bits = 64
+            BITS = 64
         elif info.is_32bit():
-            bits = 32
+            BITS = 32
         else:
-            bits = 16
+            BITS = 16
 
         print "LazyIDA (v1.0.0.3) plugin has been loaded."
 
@@ -504,16 +479,16 @@ class LazyIDA_t(idaapi.plugin_t):
         # Add hexrays ui callback
         if idaapi.init_hexrays_plugin():
             addon = idaapi.addon_info_t()
-            addon.id = "tw.l4ys.lazyida";
-            addon.name = "LazyIDA";
-            addon.producer = "Lays";
-            addon.url = "https://github.com/L4ys/LazyIDA";
-            addon.version = "1.0.0.3";
+            addon.id = "tw.l4ys.lazyida"
+            addon.name = "LazyIDA"
+            addon.producer = "Lays"
+            addon.url = "https://github.com/L4ys/LazyIDA"
+            addon.version = "1.0.0.3"
             idaapi.register_addon(addon)
 
             hx_actions = (
                 idaapi.action_desc_t(ACTION_HX_REMOVERETTYPE, "Remove return type", hexrays_action_handler_t(ACTION_HX_REMOVERETTYPE), "v"),
-                idaapi.action_desc_t(ACTION_HX_COPYEA , "Copy ea", hexrays_action_handler_t(ACTION_HX_COPYEA), "w"),
+                idaapi.action_desc_t(ACTION_HX_COPYEA, "Copy ea", hexrays_action_handler_t(ACTION_HX_COPYEA), "w"),
                 idaapi.action_desc_t(ACTION_HX_COPYNAME, "Copy name", hexrays_action_handler_t(ACTION_HX_COPYNAME), "c"),
             )
             for action in hx_actions:
@@ -547,3 +522,4 @@ class LazyIDA_t(idaapi.plugin_t):
 
 def PLUGIN_ENTRY():
     return LazyIDA_t()
+
