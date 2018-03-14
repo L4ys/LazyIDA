@@ -1,4 +1,5 @@
 import idaapi
+import idc
 from struct import unpack
 
 if idaapi.IDA_SDK_VERSION >= 690:
@@ -35,7 +36,7 @@ def save_ret_type(addr, type):
     ret_type[addr] = type;
     node.setblob(repr(ret_type), 0, 'I')
 
-class VulnChoose(Choose2):
+class VulnChoose(idaapi.Choose2):
     """
     Chooser class to display result of format string vuln scan
     """
@@ -72,7 +73,7 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
 
     def activate(self, ctx):
         if self.action == ACTION_COPYEA:
-            ea = ScreenEA()
+            ea = idc.ScreenEA()
             if ea != idaapi.BADADDR:
                 copy_to_clip("0x%X" % ea)
                 print "Address 0x%X has been copied to clipboard" % ea
@@ -95,9 +96,9 @@ class menu_action_handler_t(idaapi.action_handler_t):
             selection, start, end = idaapi.read_selection()
             if selection:
                 size = end - start
-            elif ItemSize(ScreenEA()) > 1:
-                start = ScreenEA()
-                size = ItemSize(start)
+            elif idc.ItemSize(idc.ScreenEA()) > 1:
+                start = idc.ScreenEA()
+                size = idc.ItemSize(start)
                 end = start + size
             else:
                 return False
@@ -252,9 +253,9 @@ class menu_action_handler_t(idaapi.action_handler_t):
         elif self.action == ACTION_XORDATA:
             selection, start, end = idaapi.read_selection()
             if not selection:
-                if ItemSize(ScreenEA()) > 1:
-                    start = ScreenEA()
-                    end = start + ItemSize(start)
+                if idc.ItemSize(idc.ScreenEA()) > 1:
+                    start = idc.ScreenEA()
+                    end = start + idc.ItemSize(start)
                 else:
                     return False
 
@@ -469,7 +470,7 @@ class UI_Hook(idaapi.UI_Hooks):
         form_type = idaapi.get_tform_type(form)
 
         if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
-            if idaapi.read_selection() or ItemSize(ScreenEA()) > 1:
+            if idaapi.read_selection() or idc.ItemSize(idc.ScreenEA()) > 1:
                 idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
                 idaapi.attach_action_to_popup(form, popup, ACTION_FILLNOP, None)
                 for action in ACTION_CONVERT:
