@@ -402,7 +402,7 @@ class HexRays_Hook(object):
             vu, shift_state = args
             # auto jump to target if clicked item is xxx->func();
             if vu.item.citype == idaapi.VDI_EXPR and vu.item.e.is_expr():
-                expr = tag_remove(vu.item.e.print1(None))
+                expr = idaapi.tag_remove(vu.item.e.print1(None))
                 if "->" in expr:
                     # find target function
                     name = expr.split("->")[-1]
