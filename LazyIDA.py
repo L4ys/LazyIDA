@@ -155,7 +155,6 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     # python list word
                     data += "\x00"
                     print "[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2))
-                    print output
                 elif self.action == ACTION_CONVERT[8]:
                     # python list dword
                     data += "\x00" * 3
