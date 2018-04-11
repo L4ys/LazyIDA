@@ -1,5 +1,11 @@
 from struct import unpack
 import idaapi
+import idautils
+import idc
+try:
+    from idc_bc695 import *
+except ImportError:
+    pass
 
 if idaapi.IDA_SDK_VERSION >= 690:
     from PyQt5.Qt import QApplication
@@ -27,12 +33,12 @@ BITS = 0
 def copy_to_clip(data):
     QApplication.clipboard().setText(data)
 
-class VulnChoose(Choose2):
+class VulnChoose(idaapi.Choose2):
     """
     Chooser class to display result of format string vuln scan
     """
     def __init__(self, title, items, icon, embedded=False):
-        Choose2.__init__(self, title, [["Address", 20], ["Function", 30], ["Format", 30]], embedded=embedded)
+        idaapi.Choose2.__init__(self, title, [["Address", 20], ["Function", 30], ["Format", 30]], embedded=embedded)
         self.items = items
         self.icon = 45
 
@@ -186,10 +192,10 @@ class menu_action_handler_t(idaapi.action_handler_t):
         elif self.action == ACTION_SCANVUL:
             print "\n[+] Finding Format String Vulnerability..."
             found = []
-            for addr in Functions():
+            for addr in idautils.Functions():
                 name = GetFunctionName(addr)
                 if "printf" in name and "v" not in name and SegName(addr) in (".text", ".plt", ".idata"):
-                    xrefs = CodeRefsTo(addr, False)
+                    xrefs = idautils.CodeRefsTo(addr, False)
                     for xref in xrefs:
                         vul = self.check_fmt_function(name, xref)
                         if vul:
