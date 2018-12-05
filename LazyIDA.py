@@ -1,3 +1,4 @@
+#encoding:utf8
 from struct import unpack
 import idaapi
 import idautils
@@ -13,7 +14,22 @@ else:
     from PySide.QtGui import QApplication
 
 IDA7 = idaapi.IDA_SDK_VERSION >= 700
-ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
+from enum import IntEnum
+class EnumActionHandle(IntEnum):
+    CONVERT_TO_STRING       = 0
+    CONVERT_TO_HEX_STRING   = 1
+    CONVERT_TO_CBYTE        = 2
+    CONVERT_TO_CWORD        = 3
+    CONVERT_TO_CDWORD       = 4
+    CONVERT_TO_CQWORD       = 5
+    CONVERT_TO_PYBYTE       = 6
+    CONVERT_TO_PYWORD       = 7
+    CONVERT_TO_PYDWORD      = 8
+    CONVERT_TO_PYQWORD      = 9
+    CONVERT_TO_GUID         = 10
+    CONVERT_TO_SAVERAW      = 11
+
+ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(12)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
 ACTION_XORDATA = "lazyida:xordata"
@@ -29,6 +45,102 @@ u64 = lambda x: unpack("<Q", x)[0]
 
 ARCH = 0
 BITS = 0
+
+import binascii
+import re
+from ctypes import *
+class HexToGuid:
+    def __init__(self, inputVal):
+        """
+        verification mem dump HEXstr len
+
+        typedef struct _GUID {  // GUID struct
+            unsigned long  Data1;
+            unsigned short Data2;
+            unsigned short Data3;
+            unsigned char  Data4[ 8 ];
+        } GUID;
+        :param inputVal:
+        """
+
+        class GUID(Structure):
+            _field_ = [
+                ('Data1', c_uint32),
+                ('Data2', c_uint16),
+                ('Data3', c_uint16),
+                ('Data4', c_char * 8)
+            ]
+
+        self.guid = GUID()
+        self.guidStr = ''
+        self.clsidStr = ''
+
+        hexStr = self.getHexStr(inputVal)
+        if hexStr is None:
+            raise ValueError
+        else:
+            self.initGuid(hexStr)
+            self.guidStr = self.getGuidStr()
+            self.clsidStr = self.getClsidStr()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        return
+
+    def getHexStr(self, inputVal):
+
+        # return Value
+        hexStr = None
+
+        # Remove redundant characters
+        redundants = '[\s\{\}\-\_]'
+        replaceTo = ''
+        inputVal = re.sub(redundants, replaceTo, inputVal)
+
+        # validate input value
+        guidPattern = '[a-fA-F0-9]{32}'
+        match = re.match(guidPattern, inputVal)
+        if match is not None:
+            hexStr = match.group(0)
+
+        return hexStr
+
+    def initGuid(self, hexStr):
+        """
+        :param hexStr:HEX
+        """
+
+        # convert string to binaryData
+        hexBinary = bytearray.fromhex(hexStr)
+        self.guid.Data1, self.guid.Data2, self.guid.Data3, self.guid.Data4 = struct.unpack('<LHH8s', hexBinary)
+
+    def getGuidStr(self):
+        '''
+        :return:  Guid
+        '''
+
+        # .decode('utf-8)' stands for removing b''
+        guid = self.guid
+        output = '%08x-%04x-%04x-%s' % (guid.Data1, guid.Data2, guid.Data3,
+                                        binascii.hexlify(guid.Data4).decode('utf-8'))
+
+        return output
+
+    def getClsidStr(self):
+        '''
+        :return:  Clsid
+        '''
+
+        # .decode('utf-8)' stands for removing b''
+        guid = self.guid
+        output = '%08x-%04x-%04x-%s-%s' % (guid.Data1, guid.Data2, guid.Data3,
+                                           binascii.hexlify(guid.Data4[0:2]).decode('utf-8'),
+                                           binascii.hexlify(guid.Data4[2:]).decode('utf-8'))
+
+        return output
+
 
 def copy_to_clip(data):
     QApplication.clipboard().setText(data)
@@ -106,13 +218,13 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 name = "data"
             if data:
                 print "\n[+] Dump 0x%X - 0x%X (%u bytes) :" % (start, end, size)
-                if self.action == ACTION_CONVERT[0]:
+                if self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_STRING]:
                     # escaped string
                     print '"%s"' % "".join("\\x%02X" % ord(b) for b in data)
-                elif self.action == ACTION_CONVERT[1]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_HEX_STRING]:
                     # hex string
                     print "".join("%02X" % ord(b) for b in data)
-                elif self.action == ACTION_CONVERT[2]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CBYTE]:
                     # C array
                     output = "unsigned char %s[%d] = {" % (name, size)
                     for i in range(size):
@@ -121,7 +233,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                         output += "0x%02X, " % ord(data[i])
                     output = output[:-2] + "\n};"
                     print output
-                elif self.action == ACTION_CONVERT[3]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CWORD]:
                     # C array word
                     data += "\x00"
                     array_size = (size + 1) / 2
@@ -132,7 +244,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                         output += "0x%04X, " % u16(data[i:i+2])
                     output = output[:-2] + "\n};"
                     print output
-                elif self.action == ACTION_CONVERT[4]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CDWORD]:
                     # C array dword
                     data += "\x00" * 3
                     array_size = (size + 3) / 4
@@ -143,7 +255,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                         output += "0x%08X, " % u32(data[i:i+4])
                     output = output[:-2] + "\n};"
                     print output
-                elif self.action == ACTION_CONVERT[5]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CQWORD]:
                     # C array qword
                     data += "\x00" * 7
                     array_size = (size + 7) / 8
@@ -154,21 +266,68 @@ class menu_action_handler_t(idaapi.action_handler_t):
                         output += "%#018X, " % u64(data[i:i+8])
                     output = output[:-2] + "\n};"
                     print output.replace("0X", "0x")
-                elif self.action == ACTION_CONVERT[6]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYBYTE]:
                     # python list
                     print "[%s]" % ", ".join("0x%02X" % ord(b) for b in data)
-                elif self.action == ACTION_CONVERT[7]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYWORD]:
                     # python list word
                     data += "\x00"
                     print "[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2))
-                elif self.action == ACTION_CONVERT[8]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYDWORD]:
                     # python list dword
                     data += "\x00" * 3
                     print "[%s]" % ", ".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4))
-                elif self.action == ACTION_CONVERT[9]:
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYQWORD]:
                     # python list qword
                     data += "\x00" * 7
-                    print "[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x")
+                    print "[%s]" %  ", ".join("%#016X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x")
+
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_GUID]:
+                    # 2018.12.3 add LazyIDA ACTION_CONVERT:
+                    # convert: char btBuf[0x10] => [GUID | UUID]
+                    data = idaapi.get_many_bytes(start, 0x10)
+                    print ("select data %s " % (",".join("0x%02X" % ord(b) for b in data)))
+
+                    try:
+
+                        with HexToGuid(("".join("%02X" % ord(b) for b in data))) as htg:
+                            print('Google This!!!')
+                            print('  GUID FORM : %s' % htg.guidStr)
+                            print('  CLSID FORM : %s' % htg.clsidStr)
+                    except ValueError:
+                        print('Invalid hex value - %s' % (",".join("0x%02X" % ord(b) for b in data)))
+
+                elif self.action == ACTION_CONVERT[EnumActionHandle.CONVERT_TO_SAVERAW]:
+                    # 2018.12.3 add LazyIDA ACTION_CONVERT:
+                    # save select Data to RawFile to cur work dir
+                    # Raw File
+                    # `AskFile(forsave, mask, prompt)`
+                    # 默认工作目录为当前输入文件的工作目录
+                    # forsave: 值为0或1, 0为启动一个 "打开"对话框, 1为启动一个"保存"对话框
+                    # mask: 字符串, 为对话框的文件过滤器 比如: 过滤".dll" 则传入过滤字符串"*.dll"
+                    # prompt:  字符串, 为对话框的"Title"
+
+                    # idc.AskFile()
+                    # print (idc.GetInputFilePath())  # 获得文件全路径
+                    # print (idc.GetInputFile())      # 获得文件名
+                    # lstFilePath = os.path.split(idc.GetInputFilePath())
+                    # idc.SetInputFilePath()
+
+                    if False:  # Open Dialog Ask To Save
+                        strSaveFile = idc.AskFile(1, hex(start) + ".bin", "SaveRawFile As")
+                        strSaveFile = os.path.split(strSaveFile)[-1]
+                    else:
+                        # strSaveFile = os.path.join(os.path.abspath(os.path.curdir), hex(start) + ".bin")  # 中文错误
+                        strSaveFile = hex(start) + ".bin"  # save to work dir
+
+                    print "SaveFile : %s" % os.path.join(os.path.abspath(os.path.curdir), strSaveFile)
+                    # SaveFile(filepath, pos, ea, size):
+                    retFlag = idc.SaveFile(strSaveFile, pos=0, ea=start, size=size)
+                    if retFlag == 1:
+                        print "SaveFile Finish!"
+                    else:
+                        print "SaveFileError!!!"
+
         elif self.action == ACTION_XORDATA:
             selection, start, end = idaapi.read_selection()
             if not selection:
@@ -451,19 +610,21 @@ class LazyIDA_t(idaapi.plugin_t):
 
         # Register menu actions
         menu_actions = (
-            idaapi.action_desc_t(ACTION_CONVERT[0], "Convert to string", menu_action_handler_t(ACTION_CONVERT[0]), None, None, 80),
-            idaapi.action_desc_t(ACTION_CONVERT[1], "Convert to hex string", menu_action_handler_t(ACTION_CONVERT[1]), None, None, 8),
-            idaapi.action_desc_t(ACTION_CONVERT[2], "Convert to C/C++ array (BYTE)", menu_action_handler_t(ACTION_CONVERT[2]), None, None, 38),
-            idaapi.action_desc_t(ACTION_CONVERT[3], "Convert to C/C++ array (WORD)", menu_action_handler_t(ACTION_CONVERT[3]), None, None, 38),
-            idaapi.action_desc_t(ACTION_CONVERT[4], "Convert to C/C++ array (DWORD)", menu_action_handler_t(ACTION_CONVERT[4]), None, None, 38),
-            idaapi.action_desc_t(ACTION_CONVERT[5], "Convert to C/C++ array (QWORD)", menu_action_handler_t(ACTION_CONVERT[5]), None, None, 38),
-            idaapi.action_desc_t(ACTION_CONVERT[6], "Convert to python list (BYTE)", menu_action_handler_t(ACTION_CONVERT[6]), None, None, 201),
-            idaapi.action_desc_t(ACTION_CONVERT[7], "Convert to python list (WORD)", menu_action_handler_t(ACTION_CONVERT[7]), None, None, 201),
-            idaapi.action_desc_t(ACTION_CONVERT[8], "Convert to python list (DWORD)", menu_action_handler_t(ACTION_CONVERT[8]), None, None, 201),
-            idaapi.action_desc_t(ACTION_CONVERT[9], "Convert to python list (QWORD)", menu_action_handler_t(ACTION_CONVERT[9]), None, None, 201),
-            idaapi.action_desc_t(ACTION_XORDATA, "Get xored data", menu_action_handler_t(ACTION_XORDATA), None, None, 9),
-            idaapi.action_desc_t(ACTION_FILLNOP, "Fill with NOPs", menu_action_handler_t(ACTION_FILLNOP), None, None, 9),
-            idaapi.action_desc_t(ACTION_SCANVUL, "Scan format string vulnerabilities", menu_action_handler_t(ACTION_SCANVUL), None, None, 160),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_STRING],        "Convert to string",                menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_STRING]), None, None, 80),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_HEX_STRING],    "Convert to hex string",            menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_HEX_STRING]), None, None, 8),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CBYTE],         "Convert to C/C++ array (BYTE)",    menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CBYTE]),   None, None, 38),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CWORD],         "Convert to C/C++ array (WORD)",    menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CWORD]),   None, None, 38),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CDWORD],        "Convert to C/C++ array (DWORD)",   menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CDWORD]),  None, None, 38),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CQWORD],        "Convert to C/C++ array (QWORD)",   menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_CQWORD]),  None, None, 38),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYBYTE],        "Convert to python list (BYTE)",    menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYBYTE]),  None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYWORD],        "Convert to python list (WORD)",    menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYWORD]),  None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYDWORD],       "Convert to python list (DWORD)",   menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYDWORD]), None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYQWORD],       "Convert to python list (QWORD)",   menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_PYQWORD]), None, None, 201),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_GUID],          "Convert to GUID",                  menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_GUID]),    None, None, 8),
+            idaapi.action_desc_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_SAVERAW],       "Save To File(RAW)",                menu_action_handler_t(ACTION_CONVERT[EnumActionHandle.CONVERT_TO_SAVERAW]), None, None, 8),
+            idaapi.action_desc_t(ACTION_XORDATA,                                            "Get xored data",                   menu_action_handler_t(ACTION_XORDATA), None, None, 9),
+            idaapi.action_desc_t(ACTION_FILLNOP,                                            "Fill with NOPs",                   menu_action_handler_t(ACTION_FILLNOP), None, None, 9),
+            idaapi.action_desc_t(ACTION_SCANVUL,                                            "Scan format string vulnerabilities", menu_action_handler_t(ACTION_SCANVUL), None, None, 160),
         )
         for action in menu_actions:
             idaapi.register_action(action)
