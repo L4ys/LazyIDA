@@ -16,12 +16,14 @@ IDA7 = idaapi.IDA_SDK_VERSION >= 700
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
+ACTION_GOTOCLIP = "lazyida:gotoclip"
 ACTION_XORDATA = "lazyida:xordata"
 ACTION_FILLNOP = "lazyida:fillnop"
 
 ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
 ACTION_HX_COPYNAME = "lazyida:hx_copyname"
+ACTION_HX_GOTOCLIP = "lazyida:hx_gotoclip"
 
 u16 = lambda x: unpack("<H", x)[0]
 u32 = lambda x: unpack("<I", x)[0]
@@ -32,6 +34,19 @@ BITS = 0
 
 def copy_to_clip(data):
     QApplication.clipboard().setText(data)
+
+def clip_text():
+    return QApplication.clipboard().text()
+
+def parse_location(loc):
+    try:
+        loc = int(loc, 16)
+    except ValueError:
+        try:
+            loc = LocByName(loc)
+        except:
+            return BADADDR
+    return loc
 
 class VulnChoose(idaapi.Choose2):
     """
@@ -74,6 +89,11 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
             if ea != idaapi.BADADDR:
                 copy_to_clip("0x%X" % ea)
                 print "Address 0x%X has been copied to clipboard" % ea
+        elif self.action == ACTION_GOTOCLIP:
+            loc = parse_location(clip_text())
+            if loc != BADADDR:
+                print "Goto location 0x%x" % loc
+                Jump(loc)
         return 1
 
     def update(self, ctx):
@@ -314,6 +334,10 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             if name:
                 copy_to_clip(name)
                 print "%s has been copied to clipboard" % name
+        elif self.action == ACTION_HX_GOTOCLIP:
+            loc = parse_location(clip_text())
+            print "Goto location 0x%x" % loc
+            Jump(loc)
         else:
             return 0
 
@@ -472,6 +496,7 @@ class LazyIDA_t(idaapi.plugin_t):
         # Register hotkey actions
         hotkey_actions = (
             idaapi.action_desc_t(ACTION_COPYEA, "Copy EA", hotkey_action_handler_t(ACTION_COPYEA), "w", "Copy current EA", 0),
+            idaapi.action_desc_t(ACTION_GOTOCLIP, "Goto clip EA", hotkey_action_handler_t(ACTION_GOTOCLIP), "Shift-G", "Goto clipboard EA", 0),
         )
         for action in hotkey_actions:
             idaapi.register_action(action)
@@ -495,6 +520,7 @@ class LazyIDA_t(idaapi.plugin_t):
                 idaapi.action_desc_t(ACTION_HX_REMOVERETTYPE, "Remove return type", hexrays_action_handler_t(ACTION_HX_REMOVERETTYPE), "v"),
                 idaapi.action_desc_t(ACTION_HX_COPYEA, "Copy ea", hexrays_action_handler_t(ACTION_HX_COPYEA), "w"),
                 idaapi.action_desc_t(ACTION_HX_COPYNAME, "Copy name", hexrays_action_handler_t(ACTION_HX_COPYNAME), "c"),
+                idaapi.action_desc_t(ACTION_HX_GOTOCLIP, "Goto clipboard ea", hexrays_action_handler_t(ACTION_HX_GOTOCLIP), "Shift-G"),
             )
             for action in hx_actions:
                 idaapi.register_action(action)
