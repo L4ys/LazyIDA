@@ -1,3 +1,4 @@
+from __future__ import print_function
 from struct import unpack
 import idaapi
 import idautils
@@ -88,11 +89,11 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
             ea = ScreenEA()
             if ea != idaapi.BADADDR:
                 copy_to_clip("0x%X" % ea)
-                print "Address 0x%X has been copied to clipboard" % ea
+                print("Address 0x%X has been copied to clipboard" % ea)
         elif self.action == ACTION_GOTOCLIP:
             loc = parse_location(clip_text())
             if loc != BADADDR:
-                print "Goto location 0x%x" % loc
+                print("Goto location 0x%x" % loc)
                 Jump(loc)
         return 1
 
@@ -125,13 +126,13 @@ class menu_action_handler_t(idaapi.action_handler_t):
             if not name:
                 name = "data"
             if data:
-                print "\n[+] Dump 0x%X - 0x%X (%u bytes) :" % (start, end, size)
+                print("\n[+] Dump 0x%X - 0x%X (%u bytes) :" % (start, end, size))
                 if self.action == ACTION_CONVERT[0]:
                     # escaped string
-                    print '"%s"' % "".join("\\x%02X" % ord(b) for b in data)
+                    print('"%s"' % "".join("\\x%02X" % ord(b) for b in data))
                 elif self.action == ACTION_CONVERT[1]:
                     # hex string
-                    print "".join("%02X" % ord(b) for b in data)
+                    print("".join("%02X" % ord(b) for b in data))
                 elif self.action == ACTION_CONVERT[2]:
                     # C array
                     output = "unsigned char %s[%d] = {" % (name, size)
@@ -140,7 +141,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                             output += "\n    "
                         output += "0x%02X, " % ord(data[i])
                     output = output[:-2] + "\n};"
-                    print output
+                    print(output)
                 elif self.action == ACTION_CONVERT[3]:
                     # C array word
                     data += "\x00"
@@ -151,7 +152,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                             output += "\n    "
                         output += "0x%04X, " % u16(data[i:i+2])
                     output = output[:-2] + "\n};"
-                    print output
+                    print(output)
                 elif self.action == ACTION_CONVERT[4]:
                     # C array dword
                     data += "\x00" * 3
@@ -162,7 +163,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                             output += "\n    "
                         output += "0x%08X, " % u32(data[i:i+4])
                     output = output[:-2] + "\n};"
-                    print output
+                    print(output)
                 elif self.action == ACTION_CONVERT[5]:
                     # C array qword
                     data += "\x00" * 7
@@ -173,22 +174,22 @@ class menu_action_handler_t(idaapi.action_handler_t):
                             output += "\n    "
                         output += "%#018X, " % u64(data[i:i+8])
                     output = output[:-2] + "\n};"
-                    print output.replace("0X", "0x")
+                    print(output.replace("0X", "0x"))
                 elif self.action == ACTION_CONVERT[6]:
                     # python list
-                    print "[%s]" % ", ".join("0x%02X" % ord(b) for b in data)
+                    print("[%s]" % ", ".join("0x%02X" % ord(b) for b in data))
                 elif self.action == ACTION_CONVERT[7]:
                     # python list word
                     data += "\x00"
-                    print "[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2))
+                    print("[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2)))
                 elif self.action == ACTION_CONVERT[8]:
                     # python list dword
                     data += "\x00" * 3
-                    print "[%s]" % ", ".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4))
+                    print("[%s]" % ", ".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4)))
                 elif self.action == ACTION_CONVERT[9]:
                     # python list qword
                     data += "\x00" * 7
-                    print "[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x")
+                    print("[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x"))
         elif self.action == ACTION_XORDATA:
             selection, start, end = idaapi.read_selection()
             if not selection:
@@ -202,15 +203,15 @@ class menu_action_handler_t(idaapi.action_handler_t):
             x = AskLong(0, "Xor with...")
             if x:
                 x &= 0xFF
-                print "\n[+] Xor 0x%X - 0x%X (%u bytes) with 0x%02X:" % (start, end, end - start, x)
-                print repr("".join(chr(ord(b) ^ x) for b in data))
+                print("\n[+] Xor 0x%X - 0x%X (%u bytes) with 0x%02X:" % (start, end, end - start, x))
+                print(repr("".join(chr(ord(b) ^ x) for b in data)))
         elif self.action == ACTION_FILLNOP:
             selection, start, end = idaapi.read_selection()
             if selection:
                 idaapi.patch_many_bytes(start, "\x90" * (end - start))
-                print "\n[+] Fill 0x%X - 0x%X (%u bytes) with NOPs" % (start, end, end - start)
+                print("\n[+] Fill 0x%X - 0x%X (%u bytes) with NOPs" % (start, end, end - start))
         elif self.action == ACTION_SCANVUL:
-            print "\n[+] Finding Format String Vulnerability..."
+            print("\n[+] Finding Format String Vulnerability...")
             found = []
             for addr in idautils.Functions():
                 name = GetFunctionName(addr)
@@ -221,11 +222,11 @@ class menu_action_handler_t(idaapi.action_handler_t):
                         if vul:
                             found.append(vul)
             if found:
-                print "[!] Done! %d possible vulnerabilities found." % len(found)
+                print("[!] Done! %d possible vulnerabilities found." % len(found))
                 ch = VulnChoose("Vulnerability", found, None, False)
                 ch.Show()
             else:
-                print "[-] No format string vulnerabilities found."
+                print("[-] No format string vulnerabilities found.")
         else:
             return 0
 
@@ -301,7 +302,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     # format is in read-only segment
                     return
 
-        print "0x%X: Possible Vulnerability: %s, format = %s" % (addr, name, opnd)
+        print("0x%X: Possible Vulnerability: %s, format = %s" % (addr, name, opnd))
         return ["0x%X" % addr, name, opnd]
 
 class hexrays_action_handler_t(idaapi.action_handler_t):
@@ -325,7 +326,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             ea = idaapi.get_screen_ea()
             if ea != idaapi.BADADDR:
                 copy_to_clip("0x%X" % ea)
-                print "Address 0x%X has been copied to clipboard" % ea
+                print("Address 0x%X has been copied to clipboard" % ea)
         elif self.action == ACTION_HX_COPYNAME:
             if IDA7:
                 name = idaapi.get_highlight(idaapi.get_current_viewer())[0]
@@ -333,10 +334,10 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 name = idaapi.get_highlighted_identifier()
             if name:
                 copy_to_clip(name)
-                print "%s has been copied to clipboard" % name
+                print("%s has been copied to clipboard" % name)
         elif self.action == ACTION_HX_GOTOCLIP:
             loc = parse_location(clip_text())
-            print "Goto location 0x%x" % loc
+            print("Goto location 0x%x" % loc)
             Jump(loc)
         else:
             return 0
@@ -471,7 +472,7 @@ class LazyIDA_t(idaapi.plugin_t):
         else:
             BITS = 16
 
-        print "LazyIDA (v1.0.0.3) plugin has been loaded."
+        print("LazyIDA (v1.0.0.3) plugin has been loaded.")
 
         # Register menu actions
         menu_actions = (
