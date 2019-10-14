@@ -49,12 +49,13 @@ def parse_location(loc):
             return BADADDR
     return loc
 
-class VulnChoose(idaapi.Choose2):
+Choose = idaapi.Choose if IDA7 else idaapi.Choose2
+class VulnChoose(Choose):
     """
     Chooser class to display result of format string vuln scan
     """
     def __init__(self, title, items, icon, embedded=False):
-        idaapi.Choose2.__init__(self, title, [["Address", 20], ["Function", 30], ["Format", 30]], embedded=embedded)
+        Choose.__init__(self, title, [["Address", 20], ["Function", 30], ["Format", 30]], embedded=embedded)
         self.items = items
         self.icon = 45
 
@@ -98,6 +99,8 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
         return 1
 
     def update(self, ctx):
+        if IDA7:
+            return idaapi.AST_ENABLE_FOR_WIDGET if ctx.form_type == idaapi.BWN_DISASM else idaapi.AST_DISABLE_FOR_WIDGET
         return idaapi.AST_ENABLE_FOR_FORM if ctx.form_type == idaapi.BWN_DISASM else idaapi.AST_DISABLE_FOR_FORM
 
 class menu_action_handler_t(idaapi.action_handler_t):
