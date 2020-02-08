@@ -1,19 +1,12 @@
+from __future__ import division
 from __future__ import print_function
 from struct import unpack
 import idaapi
 import idautils
 import idc
-try:
-    from idc_bc695 import *
-except ImportError:
-    pass
 
-if idaapi.IDA_SDK_VERSION >= 690:
-    from PyQt5.Qt import QApplication
-else:
-    from PySide.QtGui import QApplication
+from PyQt5.Qt import QApplication
 
-IDA7 = idaapi.IDA_SDK_VERSION >= 700
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
@@ -44,18 +37,17 @@ def parse_location(loc):
         loc = int(loc, 16)
     except ValueError:
         try:
-            loc = LocByName(loc)
+            loc = idc.get_name_ea_simple(loc)
         except:
-            return BADADDR
+            return idaapi.BADADDR
     return loc
 
-Choose = idaapi.Choose if IDA7 else idaapi.Choose2
-class VulnChoose(Choose):
+class VulnChoose(idaapi.Choose):
     """
     Chooser class to display result of format string vuln scan
     """
     def __init__(self, title, items, icon, embedded=False):
-        Choose.__init__(self, title, [["Address", 20], ["Function", 30], ["Format", 30]], embedded=embedded)
+        idaapi.Choose.__init__(self, title, [["Address", 20], ["Function", 30], ["Format", 30]], embedded=embedded)
         self.items = items
         self.icon = 45
 
@@ -75,7 +67,7 @@ class VulnChoose(Choose):
         return len(self.items)
 
     def OnSelectLine(self, n):
-        Jump(int(self.items[n][0], 16))
+        idc.jumpto(int(self.items[n][0], 16))
 
 class hotkey_action_handler_t(idaapi.action_handler_t):
     """
@@ -87,21 +79,19 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
 
     def activate(self, ctx):
         if self.action == ACTION_COPYEA:
-            ea = ScreenEA()
+            ea = idc.get_screen_ea()
             if ea != idaapi.BADADDR:
                 copy_to_clip("0x%X" % ea)
                 print("Address 0x%X has been copied to clipboard" % ea)
         elif self.action == ACTION_GOTOCLIP:
             loc = parse_location(clip_text())
-            if loc != BADADDR:
+            if loc != idaapi.BADADDR:
                 print("Goto location 0x%x" % loc)
-                Jump(loc)
+                idc.jumpto(loc)
         return 1
 
     def update(self, ctx):
-        if IDA7:
-            return idaapi.AST_ENABLE_FOR_WIDGET if ctx.form_type == idaapi.BWN_DISASM else idaapi.AST_DISABLE_FOR_WIDGET
-        return idaapi.AST_ENABLE_FOR_FORM if ctx.form_type == idaapi.BWN_DISASM else idaapi.AST_DISABLE_FOR_FORM
+        return idaapi.AST_ENABLE_FOR_WIDGET if ctx.form_type == idaapi.BWN_DISASM else idaapi.AST_DISABLE_FOR_WIDGET
 
 class menu_action_handler_t(idaapi.action_handler_t):
     """
@@ -114,41 +104,44 @@ class menu_action_handler_t(idaapi.action_handler_t):
     def activate(self, ctx):
         if self.action in ACTION_CONVERT:
             # convert
-            selection, start, end = idaapi.read_selection()
-            if selection:
+            t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
+            if idaapi.read_selection(view, t0, t1):
+                start, end = t0.place(view).toea(), t1.place(view).toea()
                 size = end - start
-            elif ItemSize(ScreenEA()) > 1:
-                start = ScreenEA()
-                size = ItemSize(start)
+            elif idc.get_item_size(idc.get_screen_ea()) > 1:
+                start = idc.get_screen_ea()
+                size = idc.get_item_size(start)
                 end = start + size
             else:
                 return False
 
-            data = idaapi.get_many_bytes(start, size)
-            name = Name(start)
+            data = idc.get_bytes(start, size)
+            if isinstance(data, str):  # python2 compatibility
+                data = bytearray(data)
+            name = idc.get_name(start, idc.GN_VISIBLE)
             if not name:
                 name = "data"
             if data:
                 print("\n[+] Dump 0x%X - 0x%X (%u bytes) :" % (start, end, size))
                 if self.action == ACTION_CONVERT[0]:
                     # escaped string
-                    print('"%s"' % "".join("\\x%02X" % ord(b) for b in data))
+                    print('"%s"' % "".join("\\x%02X" % b for b in data))
                 elif self.action == ACTION_CONVERT[1]:
                     # hex string
-                    print("".join("%02X" % ord(b) for b in data))
+                    print("".join("%02X" % b for b in data))
                 elif self.action == ACTION_CONVERT[2]:
                     # C array
                     output = "unsigned char %s[%d] = {" % (name, size)
                     for i in range(size):
                         if i % 16 == 0:
                             output += "\n    "
-                        output += "0x%02X, " % ord(data[i])
+                        output += "0x%02X, " % data[i]
                     output = output[:-2] + "\n};"
                     print(output)
                 elif self.action == ACTION_CONVERT[3]:
                     # C array word
-                    data += "\x00"
-                    array_size = (size + 1) / 2
+                    data += b"\x00"
+                    array_size = (size + 1) // 2
                     output = "unsigned short %s[%d] = {" % (name, array_size)
                     for i in range(0, size, 2):
                         if i % 16 == 0:
@@ -158,8 +151,8 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     print(output)
                 elif self.action == ACTION_CONVERT[4]:
                     # C array dword
-                    data += "\x00" * 3
-                    array_size = (size + 3) / 4
+                    data += b"\x00" * 3
+                    array_size = (size + 3) // 4
                     output = "unsigned int %s[%d] = {" % (name, array_size)
                     for i in range(0, size, 4):
                         if i % 32 == 0:
@@ -169,8 +162,8 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     print(output)
                 elif self.action == ACTION_CONVERT[5]:
                     # C array qword
-                    data += "\x00" * 7
-                    array_size = (size + 7) / 8
+                    data += b"\x00" * 7
+                    array_size = (size + 7) // 8
                     output = "unsigned long %s[%d] = {" % (name, array_size)
                     for i in range(0, size, 8):
                         if i % 32 == 0:
@@ -180,45 +173,50 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     print(output.replace("0X", "0x"))
                 elif self.action == ACTION_CONVERT[6]:
                     # python list
-                    print("[%s]" % ", ".join("0x%02X" % ord(b) for b in data))
+                    print("[%s]" % ", ".join("0x%02X" % b for b in data))
                 elif self.action == ACTION_CONVERT[7]:
                     # python list word
-                    data += "\x00"
+                    data += b"\x00"
                     print("[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2)))
                 elif self.action == ACTION_CONVERT[8]:
                     # python list dword
-                    data += "\x00" * 3
+                    data += b"\x00" * 3
                     print("[%s]" % ", ".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4)))
                 elif self.action == ACTION_CONVERT[9]:
                     # python list qword
-                    data += "\x00" * 7
+                    data += b"\x00" * 7
                     print("[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x"))
         elif self.action == ACTION_XORDATA:
-            selection, start, end = idaapi.read_selection()
-            if not selection:
-                if ItemSize(ScreenEA()) > 1:
-                    start = ScreenEA()
-                    end = start + ItemSize(start)
+            t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
+            if idaapi.read_selection(view, t0, t1):
+                start, end = t0.place(view).toea(), t1.place(view).toea()
+            else:
+                if idc.get_item_size(idc.get_screen_ea()) > 1:
+                    start = idc.get_screen_ea()
+                    end = start + idc.get_item_size(start)
                 else:
                     return False
 
-            data = idaapi.get_many_bytes(start, end - start)
-            x = AskLong(0, "Xor with...")
+            data = idc.get_bytes(start, end - start)
+            if isinstance(data, str):  # python2 compatibility
+                data = bytearray(data)
+            x = idaapi.ask_long(0, "Xor with...")
             if x:
                 x &= 0xFF
                 print("\n[+] Xor 0x%X - 0x%X (%u bytes) with 0x%02X:" % (start, end, end - start, x))
-                print(repr("".join(chr(ord(b) ^ x) for b in data)))
+                print(repr("".join(chr(b ^ x) for b in data)))
         elif self.action == ACTION_FILLNOP:
-            selection, start, end = idaapi.read_selection()
-            if selection:
-                idaapi.patch_many_bytes(start, "\x90" * (end - start))
+            t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
+            if idaapi.read_selection(view, t0, t1):
+                start, end = t0.place(view).toea(), t1.place(view).toea()
+                idaapi.patch_bytes(start, b"\x90" * (end - start))
                 print("\n[+] Fill 0x%X - 0x%X (%u bytes) with NOPs" % (start, end, end - start))
         elif self.action == ACTION_SCANVUL:
             print("\n[+] Finding Format String Vulnerability...")
             found = []
             for addr in idautils.Functions():
-                name = GetFunctionName(addr)
-                if "printf" in name and "v" not in name and SegName(addr) in (".text", ".plt", ".idata"):
+                name = idc.get_func_name(addr)
+                if "printf" in name and "v" not in name and idc.get_segm_name(addr) in (".text", ".plt", ".idata"):
                     xrefs = idautils.CodeRefsTo(addr, False)
                     for xref in xrefs:
                         vul = self.check_fmt_function(name, xref)
@@ -243,17 +241,17 @@ class menu_action_handler_t(idaapi.action_handler_t):
         """
         Check if the format string argument is not valid
         """
-        function_head = GetFunctionAttr(addr, idc.FUNCATTR_START)
+        function_head = idc.get_func_attr(addr, idc.FUNCATTR_START)
 
         while True:
-            addr = idc.PrevHead(addr)
-            op = GetMnem(addr).lower()
-            dst = GetOpnd(addr, 0)
+            addr = idc.prev_head(addr)
+            op = idc.print_insn_mnem(addr).lower()
+            dst = idc.print_operand(addr, 0)
 
             if op in ("ret", "retn", "jmp", "b") or addr < function_head:
                 return
 
-            c = GetCommentEx(addr, 0)
+            c = idc.get_cmt(addr, 0)
             if c and c.lower() == "format":
                 break
             elif name.endswith(("snprintf_chk",)):
@@ -278,27 +276,27 @@ class menu_action_handler_t(idaapi.action_handler_t):
 
         # format arg found, check its type and value
         # get last oprend
-        op_index = GetDisasm(addr).count(",")
-        op_type = GetOpType(addr, op_index)
-        opnd = GetOpnd(addr, op_index)
+        op_index = idc.generate_disasm_line(addr, 0).count(",")
+        op_type = idc.get_operand_type(addr, op_index)
+        opnd = idc.print_operand(addr, op_index)
 
-        if op_type == o_reg:
+        if op_type == idc.o_reg:
             # format is in register, try to track back and get the source
             _addr = addr
             while True:
-                _addr = idc.PrevHead(_addr)
-                _op = GetMnem(_addr).lower()
+                _addr = idc.prev_head(_addr)
+                _op = idc.print_insn_mnem(_addr).lower()
                 if _op in ("ret", "retn", "jmp", "b") or _addr < function_head:
                     break
-                elif _op in ("mov", "lea", "ldr") and GetOpnd(_addr, 0) == opnd:
-                    op_type = GetOpType(_addr, 1)
-                    opnd = GetOpnd(_addr, 1)
+                elif _op in ("mov", "lea", "ldr") and idc.print_operand(_addr, 0) == opnd:
+                    op_type = idc.get_operand_type(_addr, 1)
+                    opnd = idc.print_operand(_addr, 1)
                     addr = _addr
                     break
 
-        if op_type == o_imm or op_type == o_mem:
+        if op_type == idc.o_imm or op_type == idc.o_mem:
             # format is a memory address, check if it's in writable segment
-            op_addr = GetOperandValue(addr, op_index)
+            op_addr = idc.get_operand_value(addr, op_index)
             seg = idaapi.getseg(op_addr)
             if seg:
                 if not seg.perm & idaapi.SEGPERM_WRITE:
@@ -319,10 +317,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
 
     def activate(self, ctx):
         if self.action == ACTION_HX_REMOVERETTYPE:
-            if IDA7:
-                vdui = idaapi.get_widget_vdui(ctx.widget)
-            else:
-                vdui = idaapi.get_tform_vdui(ctx.form)
+            vdui = idaapi.get_widget_vdui(ctx.widget)
             self.remove_rettype(vdui)
             vdui.refresh_ctext()
         elif self.action == ACTION_HX_COPYEA:
@@ -331,28 +326,22 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 copy_to_clip("0x%X" % ea)
                 print("Address 0x%X has been copied to clipboard" % ea)
         elif self.action == ACTION_HX_COPYNAME:
-            if IDA7:
-                name = idaapi.get_highlight(idaapi.get_current_viewer())[0]
-            else:
-                name = idaapi.get_highlighted_identifier()
+            name = idaapi.get_highlight(idaapi.get_current_viewer())[0]
             if name:
                 copy_to_clip(name)
                 print("%s has been copied to clipboard" % name)
         elif self.action == ACTION_HX_GOTOCLIP:
             loc = parse_location(clip_text())
             print("Goto location 0x%x" % loc)
-            Jump(loc)
+            idc.jumpto(loc)
         else:
             return 0
 
         return 1
 
     def update(self, ctx):
-        if IDA7:
-            vdui = idaapi.get_widget_vdui(ctx.widget)
-            return idaapi.AST_ENABLE_FOR_WIDGET if vdui else idaapi.AST_DISABLE_FOR_WIDGET
-        vdui = idaapi.get_tform_vdui(ctx.form)
-        return idaapi.AST_ENABLE_FOR_FORM if vdui else idaapi.AST_DISABLE_FOR_FORM
+        vdui = idaapi.get_widget_vdui(ctx.widget)
+        return idaapi.AST_ENABLE_FOR_WIDGET if vdui else idaapi.AST_DISABLE_FOR_WIDGET
 
     def remove_rettype(self, vu):
         if vu.item.citype == idaapi.VDI_FUNC:
@@ -410,11 +399,12 @@ class UI_Hook(idaapi.UI_Hooks):
     def __init__(self):
         idaapi.UI_Hooks.__init__(self)
 
-    def finish_populating_tform_popup(self, form, popup):
-        form_type = idaapi.get_tform_type(form)
+    def finish_populating_widget_popup(self, form, popup):
+        form_type = idaapi.get_widget_type(form)
 
         if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
-            if idaapi.read_selection() or ItemSize(ScreenEA()) > 1:
+            t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
+            if idaapi.read_selection(view, t0, t1) or idc.get_item_size(idc.get_screen_ea()) > 1:
                 idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
                 idaapi.attach_action_to_popup(form, popup, ACTION_FILLNOP, None)
                 for action in ACTION_CONVERT:
@@ -424,6 +414,7 @@ class UI_Hook(idaapi.UI_Hooks):
                                                                (idaapi.PLFM_386, 64),
                                                                (idaapi.PLFM_ARM, 32),]:
             idaapi.attach_action_to_popup(form, popup, ACTION_SCANVUL, None)
+
 
 class HexRays_Hook(object):
     def callback(self, event, *args):
@@ -439,16 +430,16 @@ class HexRays_Hook(object):
                 if "->" in expr:
                     # find target function
                     name = expr.split("->")[-1]
-                    addr = LocByName(name)
+                    addr = idc.get_name_ea_simple(name)
                     if addr == idaapi.BADADDR:
                         # try class::function
                         e = vu.item.e
                         while e.x:
                             e = e.x
-                        addr = LocByName("%s::%s" % (str(e.type).split()[0], name))
+                        addr = idc.get_name_ea_simple("%s::%s" % (str(e.type).split()[0], name))
 
                     if addr != idaapi.BADADDR:
-                        Jump(addr)
+                        idc.jumpto(addr)
                         return 1
         return 0
 
@@ -540,7 +531,7 @@ class LazyIDA_t(idaapi.plugin_t):
         pass
 
     def term(self):
-        if self.ui_hook:
+        if hasattr(self, "ui_hook"):
             self.ui_hook.unhook()
 
         # Unregister actions
