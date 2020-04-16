@@ -390,7 +390,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
             new_func_type.create_func(fi)
 
             # Apply new function type
-            if idaapi.apply_tinfo2(ea, new_func_type, idaapi.TINFO_DEFINITE):
+            if idaapi.apply_tinfo(ea, new_func_type, idaapi.TINFO_DEFINITE):
                 return vu.refresh_view(True)
 
         return False
