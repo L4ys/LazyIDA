@@ -37,7 +37,7 @@ def parse_location(loc):
         loc = int(loc, 16)
     except ValueError:
         try:
-            loc = idc.get_name_ea_simple(loc)
+            loc = idc.get_name_ea_simple(loc.encode())
         except:
             return idaapi.BADADDR
     return loc
