@@ -91,7 +91,10 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
         return 1
 
     def update(self, ctx):
-        return idaapi.AST_ENABLE_FOR_WIDGET if ctx.form_type == idaapi.BWN_DISASM else idaapi.AST_DISABLE_FOR_WIDGET
+        if ctx.form_type in (idaapi.BWN_DISASM, idaapi.BWN_DUMP):
+            return idaapi.AST_ENABLE_FOR_WIDGET
+        else:
+            return idaapi.AST_DISABLE_FOR_WIDGET
 
 class menu_action_handler_t(idaapi.action_handler_t):
     """
