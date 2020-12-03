@@ -1,11 +1,14 @@
 from __future__ import division
 from __future__ import print_function
+import binascii
 from struct import unpack
 import idaapi
 import idautils
 import idc
+import base64
 
 from PyQt5.Qt import QApplication
+from PyQt5.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QLabel, QRadioButton, QTextEdit, QPushButton
 
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
@@ -13,6 +16,7 @@ ACTION_COPYEA = "lazyida:copyea"
 ACTION_GOTOCLIP = "lazyida:gotoclip"
 ACTION_XORDATA = "lazyida:xordata"
 ACTION_FILLNOP = "lazyida:fillnop"
+ACTION_PASTE = "lazyida:paste"
 
 ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
@@ -25,6 +29,53 @@ u64 = lambda x: unpack("<Q", x)[0]
 
 ARCH = 0
 BITS = 0
+
+class paste_data_window(QDialog):
+    def __init__(self, target_addr):
+        super(paste_data_window, self).__init__()
+        self.addr = target_addr
+        self.setWindowTitle('Paste data')
+        layout_main = QVBoxLayout()
+        layout_option = QHBoxLayout()
+        layout_option.addWidget(QLabel("Input Type: "))
+        self.option_types = [QRadioButton("HEX"), QRadioButton("BASE64"), QRadioButton("ASCII")]
+        self.option_types[0].setChecked(True)
+        for qcheck in self.option_types:
+            layout_option.addWidget(qcheck)
+        self.edit = QTextEdit()
+        self.btn_apply = QPushButton("Apply")
+        layout_main.addWidget(QLabel("Target Addr: %s " % hex(target_addr)[2:].upper()))
+        layout_main.addLayout(layout_option)
+        layout_main.addWidget(self.edit)
+        layout_main.addWidget(self.btn_apply)
+        self.btn_apply.clicked.connect(self.event_apply_onclicked)
+        self.setLayout(layout_main)
+        self.show()
+        self.exec_()
+
+    def event_apply_onclicked(self):
+        text = self.edit.toPlainText()
+        if self.option_types[0].isChecked():
+            text = text.strip()
+            stopWords = [",", "0x", "{", "}", "H", "h", "[", "]", " ", "\n", ";"]
+            for ch in stopWords:
+                text = text.replace(ch, "")
+            print("HEX:" + text)
+            hex_bytes = bytearray(binascii.a2b_hex(text))
+            for i in range(len(hex_bytes)):
+                PatchByte(self.addr + i, hex_bytes[i])
+            self.close()
+        elif self.option_types[1].isChecked():
+            text = text.strip()
+            hex_bytes = bytearray(base64.b64decode(text))
+            for i in range(len(hex_bytes)):
+                PatchByte(self.addr + i, hex_bytes[i])
+            self.close()
+        elif self.option_types[2].isChecked():
+            hex_bytes = bytearray(text.encode('utf-8'))
+            for i in range(len(hex_bytes)):
+                PatchByte(self.addr + i, hex_bytes[i])
+            self.close()
 
 def copy_to_clip(data):
     QApplication.clipboard().setText(data)
@@ -231,6 +282,10 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 ch.Show()
             else:
                 print("[-] No format string vulnerabilities found.")
+        elif self.action == ACTION_PASTE:
+            print("paste data.")
+            paste_data_window(idc.get_screen_ea())
+
         else:
             return 0
 
@@ -404,8 +459,9 @@ class UI_Hook(idaapi.UI_Hooks):
 
     def finish_populating_widget_popup(self, form, popup):
         form_type = idaapi.get_widget_type(form)
-
+        print("aaaa")
         if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
+            idaapi.attach_action_to_popup(form, popup, ACTION_PASTE, None)
             t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
             if idaapi.read_selection(view, t0, t1) or idc.get_item_size(idc.get_screen_ea()) > 1:
                 idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
@@ -485,7 +541,9 @@ class LazyIDA_t(idaapi.plugin_t):
             idaapi.action_desc_t(ACTION_CONVERT[9], "Convert to python list (QWORD)", menu_action_handler_t(ACTION_CONVERT[9]), None, None, 201),
             idaapi.action_desc_t(ACTION_XORDATA, "Get xored data", menu_action_handler_t(ACTION_XORDATA), None, None, 9),
             idaapi.action_desc_t(ACTION_FILLNOP, "Fill with NOPs", menu_action_handler_t(ACTION_FILLNOP), None, None, 9),
+            idaapi.action_desc_t(ACTION_PASTE, "Paste Data", menu_action_handler_t(ACTION_PASTE), None, None, 9),
             idaapi.action_desc_t(ACTION_SCANVUL, "Scan format string vulnerabilities", menu_action_handler_t(ACTION_SCANVUL), None, None, 160),
+
         )
         for action in menu_actions:
             idaapi.register_action(action)
