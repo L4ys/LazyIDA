@@ -25,8 +25,10 @@ Make your IDA Lazy!
       - `c`: Copy name of current item into clipboard
       - `v`: Remove return type of current item
 
-![](https://x1hy9.oss-cn-beijing.aliyuncs.com/img/%7B604FF5B0-723B-943A-B34A-DA2E2D7B6D91%7D.jpg)
   - paste data to arbitary address, supports paste from HEX, BASE64, or ASCII
-  
+
+![](https://x1hy9.oss-cn-beijing.aliyuncs.com/img/%7B604FF5B0-723B-943A-B34A-DA2E2D7B6D91%7D.jpg)
+  - lazy dumper, A tool for dump  memory to a file, you can specify it size in ui.
+
 ![](https://x1hy9.oss-cn-beijing.aliyuncs.com/img/%7B9ED5EC0D-3338-0CA6-EB59-7414CFB9C4E8%7D.jpg)
-  - lazy dumper, A tool for dump  memory to a file, you specify it size in ui.
+  
