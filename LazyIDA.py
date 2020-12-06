@@ -8,7 +8,7 @@ import idc
 import base64
 
 from PyQt5.Qt import QApplication
-from PyQt5.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QLabel, QRadioButton, QTextEdit, QPushButton
+from PyQt5.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QLabel, QRadioButton, QTextEdit, QPushButton, QLineEdit, QMessageBox, QFileDialog
 
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
@@ -17,6 +17,7 @@ ACTION_GOTOCLIP = "lazyida:gotoclip"
 ACTION_XORDATA = "lazyida:xordata"
 ACTION_FILLNOP = "lazyida:fillnop"
 ACTION_PASTE = "lazyida:paste"
+ACTION_DUMPER = "lazyida:dumper"
 
 ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
@@ -29,6 +30,76 @@ u64 = lambda x: unpack("<Q", x)[0]
 
 ARCH = 0
 BITS = 0
+
+def dump_bytes(addr, size):
+    buffer = bytearray()
+    for i in range(size):
+        buffer.append(Byte(addr + i))
+    return buffer
+
+class dumper_windows(QDialog):
+    def __init__(self):
+        super(dumper_windows, self).__init__()
+        self.addr = idc.get_screen_ea()
+        self.setWindowTitle("Lazy dumper.")
+        layout_main = QVBoxLayout()
+        layout_base = QHBoxLayout()
+        layout_base.addWidget(QLabel("Base(HEX):"))
+        self.edit_base = QLineEdit()
+        layout_base.addWidget(self.edit_base)
+        layout_size = QHBoxLayout()
+        layout_size.addWidget(QLabel("Size(HEX):"))
+        self.edit_size = QLineEdit()
+        layout_size.addWidget(self.edit_size)
+
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_dump = QPushButton("Dump")
+
+        layout_main.addLayout(layout_base)
+        layout_main.addLayout(layout_size)
+        layout_main.addWidget(self.btn_dump)
+        self.edit_base.setText(hex(self.addr))
+
+        self.setLayout(layout_main)
+
+        self.btn_dump.clicked.connect(self.click_dump)
+
+        self.show()
+        self.exec_()
+
+    def hex_cleaner(self, s):
+        s = s.strip()
+        s = s.replace("0x", "")
+        s = s.replace("h", "")
+        s = s.replace("L", "")
+        return s
+
+    def click_cancel(self):
+        self.close()
+
+    def click_dump(self):
+        addr = self.edit_base.text()
+        size = self.edit_size.text()
+        try:
+            addr = int(self.hex_cleaner(addr), 16)
+            size = int(self.hex_cleaner(size), 16)
+        except ValueError as e:
+            QMessageBox.warning(self, " Error ", "Wrong numbers! please check!")
+            return
+
+        print("dump from %x size:%x" % (addr, size))
+        data = dump_bytes(addr, size)
+        fileName, filetype = QFileDialog.getSaveFileName(self,  
+                                    "File Saving",  
+                                    "",
+                                    "All Files (*)")
+        fp = open(fileName, 'wb')
+        fp.write(data)
+        fp.close()
+        print ("saved to : " + fileName)
+        self.close()
+
+
 
 class paste_data_window(QDialog):
     def __init__(self, target_addr):
@@ -285,7 +356,9 @@ class menu_action_handler_t(idaapi.action_handler_t):
         elif self.action == ACTION_PASTE:
             print("paste data.")
             paste_data_window(idc.get_screen_ea())
-
+        elif self.action == ACTION_DUMPER:
+            print( "dump data.")
+            dumper_windows()
         else:
             return 0
 
@@ -459,9 +532,9 @@ class UI_Hook(idaapi.UI_Hooks):
 
     def finish_populating_widget_popup(self, form, popup):
         form_type = idaapi.get_widget_type(form)
-        print("aaaa")
         if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
             idaapi.attach_action_to_popup(form, popup, ACTION_PASTE, None)
+            idaapi.attach_action_to_popup(form, popup, ACTION_DUMPER, None)
             t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
             if idaapi.read_selection(view, t0, t1) or idc.get_item_size(idc.get_screen_ea()) > 1:
                 idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
@@ -542,6 +615,7 @@ class LazyIDA_t(idaapi.plugin_t):
             idaapi.action_desc_t(ACTION_XORDATA, "Get xored data", menu_action_handler_t(ACTION_XORDATA), None, None, 9),
             idaapi.action_desc_t(ACTION_FILLNOP, "Fill with NOPs", menu_action_handler_t(ACTION_FILLNOP), None, None, 9),
             idaapi.action_desc_t(ACTION_PASTE, "Paste Data", menu_action_handler_t(ACTION_PASTE), None, None, 9),
+            idaapi.action_desc_t(ACTION_DUMPER, "Lazy Dumper", menu_action_handler_t(ACTION_DUMPER), None, None, 9),
             idaapi.action_desc_t(ACTION_SCANVUL, "Scan format string vulnerabilities", menu_action_handler_t(ACTION_SCANVUL), None, None, 160),
 
         )
