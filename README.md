@@ -5,6 +5,11 @@ Make your IDA Lazy!
 1. put `LazyIDA.py` into `plugins` folder under your IDA Pro installation path.
 
 # Features
+- 原版很久没更新【添加以下功能】
+  - 自动重定位跳转 （调试的时候不用重新计算偏移或者rebase）
+  - DUMP 指定内存到文件(脱壳不用脚本了)
+  - 粘贴 ASCII/HEX/BASE64 到指定内存 （批量修改内存）
+  
 - Jump to other based-address without rebase the idb.
 ![](https://a123-1304302739.cos.ap-chengdu.myqcloud.com/%7BCC12AA66-0AAC-585B-09FD-FD50E90FE957%7D.jpg)
 
