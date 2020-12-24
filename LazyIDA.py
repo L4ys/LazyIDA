@@ -38,10 +38,7 @@ history_jmp_base = []
 
 
 def dump_bytes(addr, size):
-    buffer = bytearray()
-    for i in range(size):
-        buffer.append(Byte(addr + i))
-    return buffer
+    return idc.get_bytes(addr, size)
 
 
 def toHex(x):
@@ -67,7 +64,7 @@ class jmper_windows(QDialog):
 
         self.setWindowTitle("Lazy Jumper")
         self.cur_addr = idc.get_screen_ea()
-        self.cur_image_base = idaapi.get_imagebase(self.cur_addr)
+        self.cur_image_base = idaapi.get_imagebase()
 
         layout_main = QVBoxLayout()
         layout_main.addWidget(QLabel("Jump without rebase the idb."))
@@ -136,7 +133,7 @@ class jmper_windows(QDialog):
         if target_base_hex not in history_jmp_base:
             history_jmp_base.append(target_base_hex)
         print("original base: %x new base: %x offset:%x" % (self.cur_image_base, target_base, offset))
-        idc.Jump(real_offset)
+        idc.jumpto(real_offset)
         self.close()
 
 
@@ -229,18 +226,18 @@ class paste_data_window(QDialog):
             print("HEX:" + text)
             hex_bytes = bytearray(binascii.a2b_hex(text))
             for i in range(len(hex_bytes)):
-                PatchByte(self.addr + i, hex_bytes[i])
+                idaapi.patch_byte(self.addr + i, hex_bytes[i])
             self.close()
         elif self.option_types[1].isChecked():
             text = text.strip()
             hex_bytes = bytearray(base64.b64decode(text))
             for i in range(len(hex_bytes)):
-                PatchByte(self.addr + i, hex_bytes[i])
+                idaapi.patch_byte(self.addr + i, hex_bytes[i])
             self.close()
         elif self.option_types[2].isChecked():
             hex_bytes = bytearray(text.encode('utf-8'))
             for i in range(len(hex_bytes)):
-                PatchByte(self.addr + i, hex_bytes[i])
+                idaapi.patch_byte(self.addr + i, hex_bytes[i])
             self.close()
 
 
