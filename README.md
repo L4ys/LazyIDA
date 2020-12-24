@@ -5,6 +5,23 @@ Make your IDA Lazy!
 1. put `LazyIDA.py` into `plugins` folder under your IDA Pro installation path.
 
 # Features
+- 原版很久没更新【添加以下功能】
+  - 自动重定位跳转 （调试的时候不用重新计算偏移或者rebase）
+  - DUMP 指定内存到文件(脱壳不用脚本了)
+  - 粘贴 ASCII/HEX/BASE64 到指定内存 （批量修改内存）
+  
+- Jump to other based-address without rebase the idb.
+![](https://a123-1304302739.cos.ap-chengdu.myqcloud.com/%7BCC12AA66-0AAC-585B-09FD-FD50E90FE957%7D.jpg)
+
+When you debug a program using ohter debuggers, such as ollydbg, and you want to jump to some runtime address in ida, but the imagebase had changed sometimes, so the only way is to rebase idb and type 'G' to jump to the target address. For some large program's idb, it will takes terrible time to rebase the idb.
+
+offset = target_addr - target_base + currrent_base
+
+LazyIDA can help you jump to other based-address without rebase.
+shortcuts:
+Shift + G, LazyIDA will copy the address from clipboard, and fill it in 'Target Addr'.
+
+
   - Remove function return type in Hex-Rays:
   
 ![2016-06-12 11 05 29](https://cloud.githubusercontent.com/assets/5360374/15991889/2dad5d62-30f2-11e6-8d4b-e4efb0b73c77.png)
@@ -24,3 +41,11 @@ Make your IDA Lazy!
       - `w`: Copy address of current item into clipboard
       - `c`: Copy name of current item into clipboard
       - `v`: Remove return type of current item
+
+  - paste data to arbitary address, supports paste from HEX, BASE64, or ASCII
+
+![](https://x1hy9.oss-cn-beijing.aliyuncs.com/img/%7B604FF5B0-723B-943A-B34A-DA2E2D7B6D91%7D.jpg)
+  - lazy dumper, A tool for dump  memory to a file, you can specify it size in ui.
+
+![](https://x1hy9.oss-cn-beijing.aliyuncs.com/img/%7B9ED5EC0D-3338-0CA6-EB59-7414CFB9C4E8%7D.jpg)
+  
