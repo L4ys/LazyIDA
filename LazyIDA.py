@@ -1,6 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 from struct import unpack
+from pyperclip import copy
 import idaapi
 import idautils
 import idc
@@ -128,10 +129,10 @@ class menu_action_handler_t(idaapi.action_handler_t):
                 print("\n[+] Dump 0x%X - 0x%X (%u bytes) :" % (start, end, size))
                 if self.action == ACTION_CONVERT[0]:
                     # escaped string
-                    print('"%s"' % "".join("\\x%02X" % b for b in data))
+                    output = '"%s"' % "".join("\\x%02X" % b for b in data)
                 elif self.action == ACTION_CONVERT[1]:
                     # hex string
-                    print("".join("%02X" % b for b in data))
+                    output = "".join("%02X" % b for b in data)
                 elif self.action == ACTION_CONVERT[2]:
                     # C array
                     output = "unsigned char %s[%d] = {" % (name, size)
@@ -140,7 +141,6 @@ class menu_action_handler_t(idaapi.action_handler_t):
                             output += "\n    "
                         output += "0x%02X, " % data[i]
                     output = output[:-2] + "\n};"
-                    print(output)
                 elif self.action == ACTION_CONVERT[3]:
                     # C array word
                     data += b"\x00"
@@ -151,7 +151,6 @@ class menu_action_handler_t(idaapi.action_handler_t):
                             output += "\n    "
                         output += "0x%04X, " % u16(data[i:i+2])
                     output = output[:-2] + "\n};"
-                    print(output)
                 elif self.action == ACTION_CONVERT[4]:
                     # C array dword
                     data += b"\x00" * 3
@@ -162,7 +161,6 @@ class menu_action_handler_t(idaapi.action_handler_t):
                             output += "\n    "
                         output += "0x%08X, " % u32(data[i:i+4])
                     output = output[:-2] + "\n};"
-                    print(output)
                 elif self.action == ACTION_CONVERT[5]:
                     # C array qword
                     data += b"\x00" * 7
@@ -171,24 +169,25 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     for i in range(0, size, 8):
                         if i % 32 == 0:
                             output += "\n    "
-                        output += "%#018X, " % u64(data[i:i+8])
+                        output += "0x%016X, " % u64(data[i:i+8])
                     output = output[:-2] + "\n};"
-                    print(output.replace("0X", "0x"))
                 elif self.action == ACTION_CONVERT[6]:
                     # python list
-                    print("[%s]" % ", ".join("0x%02X" % b for b in data))
+                    output = "[%s]" % ", ".join("0x%02X" % b for b in data)
                 elif self.action == ACTION_CONVERT[7]:
                     # python list word
                     data += b"\x00"
-                    print("[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2)))
+                    output = "[%s]" % ", ".join("0x%04X" % u16(data[i:i+2]) for i in range(0, size, 2))
                 elif self.action == ACTION_CONVERT[8]:
                     # python list dword
                     data += b"\x00" * 3
-                    print("[%s]" % ", ".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4)))
+                    output = "[%s]" % ", ".join("0x%08X" % u32(data[i:i+4]) for i in range(0, size, 4))
                 elif self.action == ACTION_CONVERT[9]:
                     # python list qword
                     data += b"\x00" * 7
-                    print("[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x"))
+                    output = "[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x")
+                copy(output)
+                print(output)
         elif self.action == ACTION_XORDATA:
             t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
             if idaapi.read_selection(view, t0, t1):
