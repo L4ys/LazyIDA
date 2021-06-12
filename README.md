@@ -3,6 +3,7 @@ Make your IDA Lazy!
 
 # Install
 1. put `LazyIDA.py` into `plugins` folder under your IDA Pro installation path.
+2. `pip install pyperclip`
 
 # Features
   - Remove function return type in Hex-Rays:
