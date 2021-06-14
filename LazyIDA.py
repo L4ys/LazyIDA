@@ -1,7 +1,6 @@
 from __future__ import division
 from __future__ import print_function
 from struct import unpack
-from pyperclip import copy
 import idaapi
 import idautils
 import idc
@@ -186,7 +185,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     # python list qword
                     data += b"\x00" * 7
                     output = "[%s]" %  ", ".join("%#018X" % u64(data[i:i+8]) for i in range(0, size, 8)).replace("0X", "0x")
-                copy(output)
+                copy_to_clip(output)
                 print(output)
         elif self.action == ACTION_XORDATA:
             t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
