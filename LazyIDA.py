@@ -5,7 +5,10 @@ import idaapi
 import idautils
 import idc
 
-from PyQt5.Qt import QApplication
+try:
+    from PyQt5.Qt import QApplication
+except:
+    import clipboard
 
 ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
@@ -27,10 +30,16 @@ ARCH = 0
 BITS = 0
 
 def copy_to_clip(data):
-    QApplication.clipboard().setText(data)
+    try:
+        QApplication.clipboard().setText(data)
+    except:
+        clipboard.copy(data)
 
 def clip_text():
-    return QApplication.clipboard().text()
+    try:
+        return QApplication.clipboard().text()
+    except:
+        return clipboard.paste()
 
 def parse_location(loc):
     try:
