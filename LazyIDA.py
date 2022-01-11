@@ -221,7 +221,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
             found = []
             for addr in idautils.Functions():
                 name = idc.get_func_name(addr)
-                if "printf" in name and "v" not in name and idc.get_segm_name(addr) in (".text", ".plt", ".idata"):
+                if "printf" in name and "v" not in name and idc.get_segm_name(addr) in (".text", ".plt", ".idata", ".plt.got"):
                     xrefs = idautils.CodeRefsTo(addr, False)
                     for xref in xrefs:
                         vul = self.check_fmt_function(name, xref)
