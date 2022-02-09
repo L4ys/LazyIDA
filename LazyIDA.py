@@ -95,7 +95,7 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
             target_attr = "widget_type"
         else:
             target_attr = "form_type"
-        if ctx.__getattr__(target_attr) in (idaapi.BWN_DISASM, idaapi.BWN_DUMP):
+        if ctx.__getattribute__(target_attr) in (idaapi.BWN_DISASM, idaapi.BWN_DUMP):
             return idaapi.AST_ENABLE_FOR_WIDGET
         else:
             return idaapi.AST_DISABLE_FOR_WIDGET
