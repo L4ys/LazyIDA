@@ -114,7 +114,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
             t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
             if idaapi.read_selection(view, t0, t1):
                 start, end = t0.place(view).toea(), t1.place(view).toea()
-                size = end - start
+                size = end - start + 1
             elif idc.get_item_size(idc.get_screen_ea()) > 1:
                 start = idc.get_screen_ea()
                 size = idc.get_item_size(start)
