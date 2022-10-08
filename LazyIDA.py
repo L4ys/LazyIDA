@@ -331,7 +331,8 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 copy_to_clip("0x%X" % ea)
                 print("Address 0x%X has been copied to clipboard" % ea)
         elif self.action == ACTION_HX_COPYNAME:
-            name = idaapi.get_highlight(idaapi.get_current_viewer())[0]
+            highlight = idaapi.get_highlight(idaapi.get_current_viewer()) 
+            name = highlight[0] if highlight else None
             if name:
                 copy_to_clip(name)
                 print("%s has been copied to clipboard" % name)
@@ -553,4 +554,3 @@ class LazyIDA_t(idaapi.plugin_t):
 
 def PLUGIN_ENTRY():
     return LazyIDA_t()
-
