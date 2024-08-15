@@ -464,13 +464,15 @@ class LazyIDA_t(idaapi.plugin_t):
         global ARCH
         global BITS
         ARCH = idaapi.ph_get_id()
-        info = idaapi.get_inf_structure()
-        if info.is_64bit():
-            BITS = 64
-        elif info.is_32bit():
+        
+        if idaapi.inf_is_64bit():
+            BTIS = 64
+        elif idaapi.inf_is_32bit_exactly():
             BITS = 32
-        else:
+        elif idaapi.idaapi.inf_is_16bit():
             BITS = 16
+        else:
+            raise ValueError
 
         print("LazyIDA (v1.0.0.3) plugin has been loaded.")
 
