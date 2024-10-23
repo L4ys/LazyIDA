@@ -417,7 +417,7 @@ class UI_Hook(idaapi.UI_Hooks):
         if idaapi.IDA_SDK_VERSION >= 900:
             dump_type = idaapi.BWN_HEXVIEW
         else:
-            dump_dump_typeattr = idaapi.BWN_DUMP
+            dump_type = idaapi.BWN_DUMP
 
         if form_type == idaapi.BWN_DISASM or form_type == dump_type:
             t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
