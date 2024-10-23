@@ -95,7 +95,13 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
             target_attr = "widget_type"
         else:
             target_attr = "form_type"
-        if ctx.__getattribute__(target_attr) in (idaapi.BWN_DISASM, idaapi.BWN_DUMP):
+
+        if idaapi.IDA_SDK_VERSION >= 900:
+            dump_type = idaapi.BWN_HEXVIEW
+        else:
+            dump_type = idaapi.BWN_DUMP
+
+        if ctx.__getattribute__(target_attr) in (idaapi.BWN_DISASM, dump_type):
             return idaapi.AST_ENABLE_FOR_WIDGET
         else:
             return idaapi.AST_DISABLE_FOR_WIDGET
@@ -408,7 +414,12 @@ class UI_Hook(idaapi.UI_Hooks):
     def finish_populating_widget_popup(self, form, popup):
         form_type = idaapi.get_widget_type(form)
 
-        if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
+        if idaapi.IDA_SDK_VERSION >= 900:
+            dump_type = idaapi.BWN_HEXVIEW
+        else:
+            dump_dump_typeattr = idaapi.BWN_DUMP
+
+        if form_type == idaapi.BWN_DISASM or form_type == dump_type:
             t0, t1, view = idaapi.twinpos_t(), idaapi.twinpos_t(), idaapi.get_current_viewer()
             if idaapi.read_selection(view, t0, t1) or idc.get_item_size(idc.get_screen_ea()) > 1:
                 idaapi.attach_action_to_popup(form, popup, ACTION_XORDATA, None)
