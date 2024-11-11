@@ -477,7 +477,7 @@ class LazyIDA_t(idaapi.plugin_t):
         ARCH = idaapi.ph_get_id()
         
         if idaapi.inf_is_64bit():
-            BTIS = 64
+            BITS = 64
         elif idaapi.inf_is_32bit_exactly():
             BITS = 32
         elif idaapi.idaapi.inf_is_16bit():
