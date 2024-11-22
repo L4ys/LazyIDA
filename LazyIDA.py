@@ -274,7 +274,7 @@ class menu_action_handler_t(idaapi.action_handler_t):
                     break
             elif name.endswith(("snprintf", "fnprintf")):
                 if op in ("mov", "lea") and (dst.endswith(("rdx", "[esp+8]", "R2")) or
-                                             dst.endswith("edx") and BITS== 64):
+                                             dst.endswith("edx") and BITS == 64):
                     break
             elif name.endswith(("sprintf", "fprintf", "dprintf", "printf_chk")):
                 if op in ("mov", "lea") and (dst.endswith(("rsi", "[esp+4]", "R1")) or
@@ -475,15 +475,24 @@ class LazyIDA_t(idaapi.plugin_t):
         global ARCH
         global BITS
         ARCH = idaapi.ph_get_id()
-        
-        if idaapi.inf_is_64bit():
-            BITS = 64
-        elif idaapi.inf_is_32bit_exactly():
-            BITS = 32
-        elif idaapi.idaapi.inf_is_16bit():
-            BITS = 16
+
+        if idaapi.IDA_SDK_VERSION >= 900:
+            if idaapi.inf_is_64bit():
+                BITS = 64
+            elif idaapi.inf_is_32bit_exactly():
+                BITS = 32
+            elif idaapi.idaapi.inf_is_16bit():
+                BITS = 16
+            else:
+                raise ValueError
         else:
-            raise ValueError
+            info = idaapi.get_inf_structure()
+            if info.is_64bit():
+                BITS = 64
+            elif info.is_32bit():
+                BITS = 32
+            else:
+                BITS = 16
 
         print("LazyIDA (v1.0.0.3) plugin has been loaded.")
 
