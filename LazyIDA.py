@@ -481,7 +481,7 @@ class LazyIDA_t(idaapi.plugin_t):
                 BITS = 64
             elif idaapi.inf_is_32bit_exactly():
                 BITS = 32
-            elif idaapi.idaapi.inf_is_16bit():
+            elif idaapi.inf_is_16bit():
                 BITS = 16
             else:
                 raise ValueError
