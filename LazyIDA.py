@@ -97,7 +97,10 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
             target_attr = "form_type"
 
         if idaapi.IDA_SDK_VERSION >= 900:
-            dump_type = idaapi.BWN_HEXVIEW
+            try:
+                dump_type = idaapi.BWN_HEXVIEW
+            except:
+                dump_type = idaapi.BWN_DUMP
         else:
             dump_type = idaapi.BWN_DUMP
 
@@ -415,7 +418,10 @@ class UI_Hook(idaapi.UI_Hooks):
         form_type = idaapi.get_widget_type(form)
 
         if idaapi.IDA_SDK_VERSION >= 900:
-            dump_type = idaapi.BWN_HEXVIEW
+            try:
+                dump_type = idaapi.BWN_HEXVIEW
+            except:
+                dump_type = idaapi.BWN_DUMP
         else:
             dump_type = idaapi.BWN_DUMP
 
