@@ -96,8 +96,8 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
         elif self.action == ACTION_COPYFO:
             ea = idc.get_screen_ea()
             if ea != idaapi.BADADDR:
-            	fo = idaapi.get_fileregion_offset(ea)
-            	if fo != idaapi.BADADDR:
+                fo = idaapi.get_fileregion_offset(ea)
+                if fo != idaapi.BADADDR:
                     copy_to_clip("0x%X" % fo)
                     print("Address 0x%X (FO) has been copied to clipboard" % fo)
         elif self.action == ACTION_GOTOCLIPEA:
@@ -375,7 +375,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                     copy_to_clip("0x%X" % fo)
                     print("Address 0x%X (FO) has been copied to clipboard" % fo)
         elif self.action == ACTION_HX_COPYNAME:
-            highlight = idaapi.get_highlight(idaapi.get_current_viewer()) 
+            highlight = idaapi.get_highlight(idaapi.get_current_viewer())
             name = highlight[0] if highlight else None
             if name:
                 copy_to_clip(name)
