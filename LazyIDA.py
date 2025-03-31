@@ -394,7 +394,7 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 if is_named:
                     print("Goto named location '%s' 0x%X" % (name, loc))
                 else:
-                    print("Goto location 0x%X (FO)" % idaapi.get_fileregion_offset(ea))
+                    print("Goto location 0x%X (FO)" % idaapi.get_fileregion_offset(loc))
                 idc.jumpto(loc)
         else:
             return 0
@@ -547,7 +547,7 @@ class LazyIDA_t(idaapi.plugin_t):
             else:
                 BITS = 16
 
-        print("LazyIDA (v1.0.0.4) plugin has been loaded.")
+        print("LazyIDA (v1.0.0.5) plugin has been loaded.")
 
         # Register menu actions
         menu_actions = (
@@ -591,7 +591,7 @@ class LazyIDA_t(idaapi.plugin_t):
             addon.name = "LazyIDA"
             addon.producer = "Lays"
             addon.url = "https://github.com/L4ys/LazyIDA"
-            addon.version = "1.0.0.4"
+            addon.version = "1.0.0.5"
             idaapi.register_addon(addon)
 
             hx_actions = (
