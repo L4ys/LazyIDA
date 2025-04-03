@@ -64,4 +64,4 @@
 - Remove function return type in Hex-Rays decompiler
 - Convert data into different formats (strings, hex strings, C arrays, Python lists)
 - Scan for format string vulnerabilities
-- Lazy shortcuts for common operations:
+- Lazy shortcuts for common operations
