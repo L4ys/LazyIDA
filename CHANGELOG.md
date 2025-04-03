@@ -1,3 +1,7 @@
+## April 2025 (v1.0.0.5)
+### Bug Fixes
+- Corrected variable in "Goto location" print statement to display accurate file offset information.
+
 ## March 2025 (v1.0.0.4)
 ### New Features
 - Added "Copy FO" command (Shift-W)
