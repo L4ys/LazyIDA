@@ -1,0 +1,12 @@
+{
+  "IDAMetadataDescriptorVersion": 1,
+  "plugin": {
+    "name": "LazyIDA",
+    "entryPoint": "LazyIDA.py",
+    "categories": ["api-scripting-and-automation"],
+    "logoPath": "",
+    "idaVersions": ">=7.4",
+    "description" : "Make your IDA Lazy!",
+    "version": "1.0.0.5"
+  }
+}
