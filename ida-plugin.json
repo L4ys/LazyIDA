@@ -4,9 +4,9 @@
     "name": "LazyIDA",
     "entryPoint": "LazyIDA.py",
     "categories": ["api-scripting-and-automation"],
-    "logoPath": "",
+    "logoPath": "logo.png",
     "idaVersions": ">=7.4",
     "description" : "Make your IDA Lazy!",
-    "version": "1.0.0.5"
+    "version": "1.0.5"
   }
 }
