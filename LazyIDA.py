@@ -26,6 +26,7 @@ ACTION_CONVERT = ["lazyida:convert%d" % i for i in range(10)]
 ACTION_SCANVUL = "lazyida:scanvul"
 ACTION_COPYEA = "lazyida:copyea"
 ACTION_COPYFO = "lazyida:copyfo"
+ACTION_COPYFUNCO = "lazyida:copyfunco"
 ACTION_GOTOCLIPEA = "lazyida:gotoclipea"
 ACTION_GOTOCLIPFO = "lazyida:gotoclipfo"
 ACTION_XORDATA = "lazyida:xordata"
@@ -34,6 +35,7 @@ ACTION_FILLNOP = "lazyida:fillnop"
 ACTION_HX_REMOVERETTYPE = "lazyida:hx_removerettype"
 ACTION_HX_COPYEA = "lazyida:hx_copyea"
 ACTION_HX_COPYFO = "lazyida:hx_copyfo"
+ACTION_HX_COPYFUNCO = "lazyida:hx_copyfunco"
 ACTION_HX_COPYNAME = "lazyida:hx_copyname"
 ACTION_HX_GOTOCLIPEA = "lazyida:hx_gotoclipea"
 ACTION_HX_GOTOCLIPFO = "lazyida:hx_gotoclipfo"
@@ -115,6 +117,14 @@ class hotkey_action_handler_t(idaapi.action_handler_t):
                 if fo != idaapi.BADADDR:
                     copy_to_clip("0x%X" % fo)
                     print("Address 0x%X (FO) has been copied to clipboard" % fo)
+        elif self.action == ACTION_COPYFUNCO:
+            ea = idc.get_screen_ea()
+            if ea != idaapi.BADADDR:
+                func = idaapi.get_func(ea)
+                if func:
+                    off = ea - func.start_ea
+                    copy_to_clip("0x%X" % off)
+                    print("Offset 0x%X (FuncOff) has been copied to clipboard" % off)
         elif self.action == ACTION_GOTOCLIPEA:
             loc, is_named, name = parse_location(clip_text(), False)
             if loc != idaapi.BADADDR:
@@ -389,6 +399,14 @@ class hexrays_action_handler_t(idaapi.action_handler_t):
                 if fo != idaapi.BADADDR:
                     copy_to_clip("0x%X" % fo)
                     print("Address 0x%X (FO) has been copied to clipboard" % fo)
+        elif self.action == ACTION_HX_COPYFUNCO:
+            ea = idaapi.get_screen_ea()
+            if ea != idaapi.BADADDR:
+                func = idaapi.get_func(ea)
+                if func:
+                    off = ea - func.start_ea
+                    copy_to_clip("0x%X" % off)
+                    print("Offset 0x%X (FuncOff) has been copied to clipboard" % off)
         elif self.action == ACTION_HX_COPYNAME:
             highlight = idaapi.get_highlight(idaapi.get_current_viewer())
             name = highlight[0] if highlight else None
@@ -588,6 +606,7 @@ class LazyIDA_t(idaapi.plugin_t):
         hotkey_actions = (
             idaapi.action_desc_t(ACTION_COPYEA, "Copy EA", hotkey_action_handler_t(ACTION_COPYEA), "w", "Copy current EA", 0),
             idaapi.action_desc_t(ACTION_COPYFO, "Copy FO", hotkey_action_handler_t(ACTION_COPYFO), "Shift-W", "Copy current FO", 0),
+            idaapi.action_desc_t(ACTION_COPYFUNCO, "Copy Function Offset", hotkey_action_handler_t(ACTION_COPYFUNCO), "Shift-Alt-W", "Copy offset from function start", 0),
             idaapi.action_desc_t(ACTION_GOTOCLIPEA, "Goto clipboard EA", hotkey_action_handler_t(ACTION_GOTOCLIPEA), "Shift-G"),
             idaapi.action_desc_t(ACTION_GOTOCLIPFO, "Goto clipboard FO", hotkey_action_handler_t(ACTION_GOTOCLIPFO), "Ctrl-Shift-G"),
         )
@@ -613,6 +632,7 @@ class LazyIDA_t(idaapi.plugin_t):
                 idaapi.action_desc_t(ACTION_HX_REMOVERETTYPE, "Remove return type", hexrays_action_handler_t(ACTION_HX_REMOVERETTYPE), "v"),
                 idaapi.action_desc_t(ACTION_HX_COPYEA, "Copy EA", hexrays_action_handler_t(ACTION_HX_COPYEA), "w", "Copy current EA", 0),
                 idaapi.action_desc_t(ACTION_HX_COPYFO, "Copy FO", hexrays_action_handler_t(ACTION_HX_COPYFO), "Shift-W", "Copy current FO", 0),
+                idaapi.action_desc_t(ACTION_HX_COPYFUNCO, "Copy Function Offset", hexrays_action_handler_t(ACTION_HX_COPYFUNCO), "Shift-Alt-W", "Copy offset from function start", 0),
                 idaapi.action_desc_t(ACTION_HX_GOTOCLIPEA, "Goto clipboard EA", hexrays_action_handler_t(ACTION_HX_GOTOCLIPEA), "Shift-G"),
                 idaapi.action_desc_t(ACTION_HX_GOTOCLIPFO, "Goto clipboard FO", hexrays_action_handler_t(ACTION_HX_GOTOCLIPFO), "Ctrl-Shift-G"),
                 idaapi.action_desc_t(ACTION_HX_COPYNAME, "Copy name", hexrays_action_handler_t(ACTION_HX_COPYNAME), "c"),
